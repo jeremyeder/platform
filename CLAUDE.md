@@ -903,6 +903,33 @@ Special lab track for leadership training located in `docs/labs/director-trainin
 - Structured exercises for understanding the vTeam system from a strategic perspective
 - Validation reports for tracking completion and understanding
 
+### Automated Documentation
+
+The RFE workflow documentation (`docs/developer-guide/rfe-workflow-detailed-flow.md`) can be automatically regenerated from the current codebase using a GitHub Actions workflow.
+
+**How to Regenerate Documentation**:
+
+1. Go to the **Actions** tab in GitHub
+2. Select **"Regenerate ACP Flow Dev Docs"** workflow
+3. Click **"Run workflow"**
+4. The workflow will:
+   - Create a GitHub issue
+   - Tag @claude with instructions to regenerate the documentation
+   - @claude will explore the codebase and create a PR with updated documentation
+
+**Customizing the Prompt**:
+
+The regeneration instructions are in `.github/prompts/rfe-workflow-doc-generator.md`. To customize:
+1. Edit the prompt file to change exploration targets, format, or output requirements
+2. Commit changes to the prompt file
+3. Next regeneration will use the updated instructions
+
+**When to Regenerate**:
+- After significant changes to RFE workflow implementation (backend handlers, operators, runner)
+- When API endpoints change
+- When new phases are added to the workflow
+- Periodically to keep documentation fresh (recommended: quarterly)
+
 ## Production Considerations
 
 ### Security

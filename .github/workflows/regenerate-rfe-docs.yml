@@ -1,0 +1,50 @@
+name: Regenerate ACP Flow Dev Docs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  create-documentation-issue:
+    name: Create Documentation Update Issue
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create issue for @claude
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "🤖 Regenerate RFE Workflow Documentation" \
+            --label "documentation,automation" \
+            --body "$(cat <<'EOF'
+          @claude Please regenerate the RFE workflow documentation.
+
+          **Instructions**: Follow the prompt in `.github/prompts/rfe-workflow-doc-generator.md`
+
+          **Context**: This is an automated request to update the developer documentation for the RFE (Request For Enhancement) workflow based on the current codebase.
+
+          **Expected Output**:
+          - Update `docs/developer-guide/rfe-workflow-detailed-flow.md`
+          - Create a PR with the changes
+
+          **Key Requirements**:
+          - Use `code-explorer` agent to understand current implementation
+          - Generate Mermaid diagrams for data flows
+          - Include GitHub hyperlinks with line numbers
+          - Use concise, scannable format (~600 lines)
+          - Use current dates (Nov 2025)
+          - Use "Ambient Code Platform (ACP)" terminology
+
+          Please review the prompt file for complete instructions.
+          EOF
+          )"
+
+      - name: Output issue URL
+        run: echo "Documentation update issue created. @claude will process it and create a PR."
