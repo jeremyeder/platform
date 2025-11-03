@@ -248,7 +248,7 @@ Content-Type: application/json
 
 ## Phase 4-6: Specification Development
 
-**Phases**: Specify (spec.md) → Plan (plan.md) → Tasks (tasks.md)
+**Phases**: Specify (`spec.md`) → Plan (`plan.md`) → Tasks (`tasks.md`)
 
 ### Agent Execution Flow
 
@@ -277,13 +277,13 @@ sequenceDiagram
     RunnerPod->>GitHub: Clone supporting repos (reference)
     RunnerPod->>RunnerPod: Initialize Claude Code SDK
     RunnerPod->>RunnerPod: Execute prompt (/specify command)
-    RunnerPod->>RunnerPod: Create spec.md file
+    RunnerPod->>RunnerPod: Create file (spec/plan/tasks.md)
     RunnerPod->>GitHub: Commit & push to feature branch
     RunnerPod->>K8s: Update CR status (Completed)
 
     Frontend->>Backend: Poll session status (every 5s)
     Backend-->>Frontend: Status: Completed, commit SHA
-    Frontend->>GitHub: Fetch spec.md content
+    Frontend->>GitHub: Fetch file content
     Frontend-->>User: Display completed spec
 ```
 
@@ -342,7 +342,7 @@ Content-Type: application/json
 4. Execute prompt - Claude Code:
    - Discovers slash commands from `.claude/commands/`
    - Runs `/specify`, `/plan`, or `/tasks` command
-   - Creates spec.md, plan.md, or tasks.md
+   - Creates `spec.md`, `plan.md`, or `tasks.md`
 5. Auto-commit and push to GitHub (if `autoCommit: true`)
 6. Update CR status with results and commit SHA
 
@@ -368,14 +368,14 @@ graph LR
 | Location | Data | Notes |
 |----------|------|-------|
 | 💾 **Kubernetes etcd** | AgenticSession CR | Status: Completed, includes commit SHA |
-| 🐙 **GitHub (specs repo)** | spec.md / plan.md / tasks.md | New commits on feature branch |
+| 🐙 **GitHub (specs repo)** | `spec.md` / `plan.md` / `tasks.md` | New commits on feature branch |
 | 💻 **Pod Workspace** | *(deleted)* | PVC cleaned up after job completion |
 
 ---
 
 ## Phase 7: Implementation
 
-**Goal**: Write code in supporting repos based on tasks.md
+**Goal**: Write code in supporting repos based on `tasks.md`
 
 ### Key Difference: Working Directory Changes
 
