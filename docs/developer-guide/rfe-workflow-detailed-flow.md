@@ -523,10 +523,6 @@ All repos use the **same feature branch name** (e.g., `ambient-user-authenticati
 
 ## Common Questions
 
-### Q: Why doesn't the RFEWorkflow CR track phase?
-
-**A**: GitHub is the source of truth. Phase is **derived** from file existence to avoid state synchronization issues between K8s and Git.
-
 ### Q: Can I work on multiple tasks in parallel?
 
 **A**: Yes! Create multiple AgenticSessions with the same `rfe-workflow` label. They'll run in separate pods and commit to the same feature branch.
