@@ -31,10 +31,11 @@ make e2e-test CONTAINER_ENGINE=podman
 **From e2e directory:**
 ```bash
 cd e2e
-./scripts/setup-kind.sh    # Create kind cluster
-./scripts/deploy.sh         # Deploy vTeam
-./scripts/run-tests.sh      # Run Cypress tests
-./scripts/cleanup.sh        # Clean up (when done)
+./scripts/setup-kind.sh                        # Create kind cluster
+./scripts/deploy.sh                            # Deploy vTeam
+# Optional: ANTHROPIC_API_KEY=sk-... ./scripts/deploy.sh  # For session execution
+./scripts/run-tests.sh                         # Run Cypress tests
+./scripts/cleanup.sh                           # Clean up (when done)
 ```
 
 ## Prerequisites
@@ -149,7 +150,22 @@ kubectl get nodes
 This will:
 - Apply manifests using `../components/manifests/overlays/e2e/`
 - Wait for all pods to be ready
+- Configure Anthropic API key (if `ANTHROPIC_API_KEY` is set)
 - Extract test user token to `.env.test`
+
+**Optional: Enable Session Execution**
+
+To test actual AgenticSession creation and execution, provide your Anthropic API key:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... ./scripts/deploy.sh
+```
+
+This creates:
+- A `runner-secrets` Secret with your API key
+- A `ProjectSettings` CR that references it
+
+Without the API key, the platform deploys successfully but session pods will fail.
 
 **Verify:**
 ```bash
@@ -452,6 +468,10 @@ After running `./scripts/deploy.sh`, test manually:
 ```bash
 # Check all pods running
 kubectl get pods -n ambient-code
+
+# Check if Anthropic API key is configured
+kubectl get secret runner-secrets -n ambient-code &>/dev/null && echo "✓ API key configured" || echo "✗ No API key"
+kubectl get projectsettings -n ambient-code
 
 # Test frontend (add :8080 for Podman)
 curl http://vteam.local

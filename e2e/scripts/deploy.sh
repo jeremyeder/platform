@@ -56,6 +56,35 @@ echo "Waiting for deployments to be ready..."
 ./scripts/wait-for-ready.sh
 
 echo ""
+echo "Configuring Anthropic API key..."
+# Create runner secrets and ProjectSettings if ANTHROPIC_API_KEY is set
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  echo "   Creating runner-secrets with ANTHROPIC_API_KEY..."
+  kubectl create secret generic runner-secrets \
+    -n ambient-code \
+    --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+  echo "   Creating ProjectSettings..."
+  kubectl apply -f - <<EOF
+apiVersion: vteam.ambient-code/v1alpha1
+kind: ProjectSettings
+metadata:
+  name: projectsettings
+  namespace: ambient-code
+spec:
+  groupAccess:
+  - groupName: system:authenticated
+    role: admin
+  runnerSecretsName: runner-secrets
+EOF
+  echo "   ✓ Anthropic API key configured"
+else
+  echo "   ℹ️  ANTHROPIC_API_KEY not set - session execution will not work"
+  echo "   To enable sessions: ANTHROPIC_API_KEY=sk-... ./scripts/deploy.sh"
+fi
+
+echo ""
 echo "Extracting test user token..."
 # Wait for the secret to be populated with a token (max 30 seconds)
 TOKEN=""
