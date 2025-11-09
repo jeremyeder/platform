@@ -84,11 +84,11 @@ helm upgrade --install langfuse langfuse/langfuse \
   --set postgresql.auth.password="$POSTGRES_PASSWORD" \
   --set clickhouse.auth.password="$CLICKHOUSE_PASSWORD" \
   --set redis.auth.password="$REDIS_PASSWORD" \
-  --set ingress.enabled=true \
-  --set ingress.className=nginx \
-  --set ingress.hosts[0].host=langfuse.local \
-  --set ingress.hosts[0].paths[0].path=/ \
-  --set ingress.hosts[0].paths[0].pathType=Prefix \
+  --set langfuse.ingress.enabled=true \
+  --set langfuse.ingress.className=nginx \
+  --set langfuse.ingress.hosts[0].host=langfuse.local \
+  --set langfuse.ingress.hosts[0].paths[0].path=/ \
+  --set langfuse.ingress.hosts[0].paths[0].pathType=Prefix \
   --set resources.limits.cpu=1000m \
   --set resources.limits.memory=2Gi \
   --set resources.requests.cpu=500m \
