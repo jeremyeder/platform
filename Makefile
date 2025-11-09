@@ -1,4 +1,4 @@
-.PHONY: help setup-env build-all build-frontend build-backend build-operator build-runner deploy clean dev-frontend dev-backend lint test registry-login push-all dev-start dev-stop dev-test dev-logs-operator dev-restart-operator dev-operator-status dev-test-operator e2e-test e2e-setup e2e-clean
+.PHONY: help setup-env build-all build-frontend build-backend build-operator build-runner deploy clean dev-frontend dev-backend lint test registry-login push-all dev-start dev-stop dev-test dev-logs-operator dev-restart-operator dev-operator-status dev-test-operator e2e-test e2e-setup e2e-clean deploy-langfuse-kind
 
 # Default target
 help: ## Show this help message
@@ -165,3 +165,7 @@ e2e-setup: ## Install e2e test dependencies
 e2e-clean: ## Clean up e2e test environment
 	@echo "Cleaning up e2e environment..."
 	cd e2e && CONTAINER_ENGINE=$(CONTAINER_ENGINE) ./scripts/cleanup.sh
+
+deploy-langfuse-kind: ## Deploy Langfuse to kind cluster for observability POC
+	@echo "Deploying Langfuse to kind cluster..."
+	@cd e2e && ./scripts/deploy-langfuse-kind.sh
