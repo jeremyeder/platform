@@ -7,6 +7,28 @@ echo "======================================"
 echo "Deploying Langfuse to kind cluster"
 echo "======================================"
 
+# Detect container engine first (needed for kind cluster check)
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-}"
+
+if [ -z "$CONTAINER_ENGINE" ]; then
+  if command -v docker &> /dev/null && docker ps &> /dev/null 2>&1; then
+    CONTAINER_ENGINE="docker"
+  elif command -v podman &> /dev/null && podman ps &> /dev/null 2>&1; then
+    CONTAINER_ENGINE="podman"
+  else
+    echo "❌ Neither Docker nor Podman found or running"
+    exit 1
+  fi
+fi
+
+# Set KIND_EXPERIMENTAL_PROVIDER if using Podman (needed before kind commands)
+if [ "$CONTAINER_ENGINE" = "podman" ]; then
+  export KIND_EXPERIMENTAL_PROVIDER=podman
+fi
+
+echo "Using container runtime: $CONTAINER_ENGINE"
+echo ""
+
 # Check if kind cluster exists
 if ! kind get clusters 2>/dev/null | grep -q "^vteam-e2e$"; then
   echo "❌ Kind cluster 'vteam-e2e' not found"
@@ -25,23 +47,6 @@ if ! command -v kubectl &> /dev/null; then
   echo "❌ kubectl not found. Please install kubectl first."
   exit 1
 fi
-
-# Detect container engine (for consistency with other scripts)
-CONTAINER_ENGINE="${CONTAINER_ENGINE:-}"
-
-if [ -z "$CONTAINER_ENGINE" ]; then
-  if command -v docker &> /dev/null && docker ps &> /dev/null 2>&1; then
-    CONTAINER_ENGINE="docker"
-  elif command -v podman &> /dev/null && podman ps &> /dev/null 2>&1; then
-    CONTAINER_ENGINE="podman"
-  else
-    echo "❌ Neither Docker nor Podman found or running"
-    exit 1
-  fi
-fi
-
-echo "Using container runtime: $CONTAINER_ENGINE"
-echo ""
 
 # Generate secure secrets
 echo "Generating secure secrets..."
