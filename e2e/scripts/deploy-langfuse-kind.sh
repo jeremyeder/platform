@@ -173,7 +173,11 @@ echo "✅ Langfuse deployment complete!"
 echo "======================================"
 echo ""
 echo "Access Langfuse:"
-echo "   URL: http://langfuse.local"
+if [ "$CONTAINER_ENGINE" = "podman" ]; then
+  echo "   URL: http://langfuse.local:8080"
+else
+  echo "   URL: http://langfuse.local"
+fi
 echo ""
 echo "Credentials saved to:"
 echo "   e2e/.env.langfuse"

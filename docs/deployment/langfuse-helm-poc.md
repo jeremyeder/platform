@@ -108,8 +108,10 @@ The script will:
 Open your browser to:
 
 ```
-http://langfuse.local
+http://langfuse.local:8080
 ```
+
+**Note**: Port 8080 is used for Podman rootless compatibility. If using Docker, the URL is `http://langfuse.local` (port 80).
 
 You should see the Langfuse login/signup page.
 
@@ -325,6 +327,7 @@ echo "127.0.0.1 langfuse.local" | sudo tee -a /etc/hosts
 kubectl port-forward -n langfuse svc/langfuse-web 3000:3000
 
 # Access at http://localhost:3000
+# Or use the ingress at http://langfuse.local:8080 (Podman) or http://langfuse.local (Docker)
 ```
 
 ## OpenShift Deployment (Coming Soon)
