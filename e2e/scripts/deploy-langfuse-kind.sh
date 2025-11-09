@@ -52,9 +52,9 @@ fi
 echo "Generating secure secrets..."
 NEXTAUTH_SECRET=$(openssl rand -base64 32)
 SALT=$(openssl rand -base64 32)
-POSTGRES_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
-CLICKHOUSE_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
-REDIS_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 32)
+CLICKHOUSE_PASSWORD=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 32)
+REDIS_PASSWORD=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 32)
 echo "   ✓ Secrets generated"
 
 # Add Langfuse Helm repository
@@ -79,8 +79,8 @@ echo ""
 echo "Installing Langfuse..."
 helm upgrade --install langfuse langfuse/langfuse \
   --namespace langfuse \
-  --set langfuse.nextauth.secret="$NEXTAUTH_SECRET" \
-  --set langfuse.salt="$SALT" \
+  --set langfuse.nextauth.secret.value="$NEXTAUTH_SECRET" \
+  --set langfuse.salt.value="$SALT" \
   --set postgresql.auth.password="$POSTGRES_PASSWORD" \
   --set clickhouse.auth.password="$CLICKHOUSE_PASSWORD" \
   --set redis.auth.password="$REDIS_PASSWORD" \
