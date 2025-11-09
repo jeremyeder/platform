@@ -95,9 +95,18 @@ helm upgrade --install langfuse langfuse/langfuse \
   --set resources.requests.memory=1Gi \
   --set clickhouse.replicaCount=1 \
   --set clickhouse.podAntiAffinityPreset=none \
+  --set clickhouse.resources.requests.memory=512Mi \
+  --set clickhouse.resources.limits.memory=1Gi \
+  --set clickhouse.resources.requests.cpu=500m \
+  --set clickhouse.resources.limits.cpu=1 \
   --set postgresql.primary.podAntiAffinityPreset=none \
   --set redis.master.podAntiAffinityPreset=none \
+  --set zookeeper.replicaCount=1 \
   --set zookeeper.podAntiAffinityPreset=none \
+  --set zookeeper.resources.requests.memory=256Mi \
+  --set zookeeper.resources.limits.memory=512Mi \
+  --set zookeeper.resources.requests.cpu=250m \
+  --set zookeeper.resources.limits.cpu=500m \
   --wait \
   --timeout=10m
 
