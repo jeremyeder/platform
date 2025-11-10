@@ -138,6 +138,121 @@ done
 
 echo "   ✓ All pods ready"
 
+# Fix S3 credentials for langfuse-web and langfuse-worker
+echo ""
+echo "Applying S3 credential fix..."
+
+# Create JSON patch for S3 credentials
+cat > /tmp/langfuse-s3-patch.json <<'EOF'
+[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "langfuse-s3",
+          "key": "root-user"
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "langfuse-s3",
+          "key": "root-password"
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "langfuse-s3",
+          "key": "root-user"
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "langfuse-s3",
+          "key": "root-password"
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "langfuse-s3",
+          "key": "root-user"
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "langfuse-s3",
+          "key": "root-password"
+        }
+      }
+    }
+  }
+]
+EOF
+
+# Apply patch to langfuse-web deployment
+echo "   Patching langfuse-web deployment..."
+kubectl patch deployment langfuse-web -n langfuse \
+  --type='json' \
+  -p="$(cat /tmp/langfuse-s3-patch.json)" \
+  --dry-run=client &>/dev/null || true
+
+kubectl patch deployment langfuse-web -n langfuse \
+  --type='json' \
+  -p="$(cat /tmp/langfuse-s3-patch.json)" &>/dev/null
+
+# Apply patch to langfuse-worker deployment
+echo "   Patching langfuse-worker deployment..."
+kubectl patch deployment langfuse-worker -n langfuse \
+  --type='json' \
+  -p="$(cat /tmp/langfuse-s3-patch.json)" &>/dev/null
+
+# Wait for rollouts to complete
+echo "   Waiting for deployments to rollout..."
+kubectl rollout status deployment/langfuse-web -n langfuse --timeout=120s &>/dev/null
+kubectl rollout status deployment/langfuse-worker -n langfuse --timeout=120s &>/dev/null
+
+# Cleanup temp file
+rm -f /tmp/langfuse-s3-patch.json
+
+echo "   ✓ S3 credentials configured"
+
 # Add langfuse.local to /etc/hosts
 echo ""
 echo "Adding langfuse.local to /etc/hosts..."

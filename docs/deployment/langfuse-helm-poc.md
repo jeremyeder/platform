@@ -275,6 +275,93 @@ kubectl get ingress -n langfuse -o yaml
 cat /etc/hosts | grep langfuse
 ```
 
+### Issue: S3 storage errors / Traces not appearing in UI
+
+**Symptoms:**
+- Traces sent to Langfuse but not visible in UI
+- Worker logs show "Could not load credentials from any providers"
+- Web pod can upload to S3 but worker cannot download
+
+**Root cause:**
+The Helm chart deploys langfuse-web and langfuse-worker without proper S3 credentials configured by default.
+
+**Automatic fix (included in deploy script):**
+The `deploy-langfuse-kind.sh` script automatically patches both deployments after Helm installation to reference the `langfuse-s3` secret.
+
+**Manual fix if needed:**
+```bash
+# Create S3 credential patch
+cat > /tmp/langfuse-s3-patch.json <<'EOF'
+[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID",
+      "valueFrom": {"secretKeyRef": {"name": "langfuse-s3", "key": "root-user"}}
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY",
+      "valueFrom": {"secretKeyRef": {"name": "langfuse-s3", "key": "root-password"}}
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID",
+      "valueFrom": {"secretKeyRef": {"name": "langfuse-s3", "key": "root-user"}}
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY",
+      "valueFrom": {"secretKeyRef": {"name": "langfuse-s3", "key": "root-password"}}
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID",
+      "valueFrom": {"secretKeyRef": {"name": "langfuse-s3", "key": "root-user"}}
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY",
+      "valueFrom": {"secretKeyRef": {"name": "langfuse-s3", "key": "root-password"}}
+    }
+  }
+]
+EOF
+
+# Patch both deployments
+kubectl patch deployment langfuse-web -n langfuse --type='json' -p="$(cat /tmp/langfuse-s3-patch.json)"
+kubectl patch deployment langfuse-worker -n langfuse --type='json' -p="$(cat /tmp/langfuse-s3-patch.json)"
+
+# Wait for rollout
+kubectl rollout status deployment/langfuse-web -n langfuse
+kubectl rollout status deployment/langfuse-worker -n langfuse
+```
+
+**Verify the fix:**
+```bash
+# Check that credentials are set
+kubectl exec -n langfuse <langfuse-web-pod> -- env | grep S3.*SECRET
+
+# Send a test trace and verify it appears in UI
+# (See langfuse-test-client.py in the repository)
+```
+
 ### Issue: Database connection errors
 
 **Check PostgreSQL pod:**
