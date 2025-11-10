@@ -16,5 +16,5 @@ type: Opaque
 stringData:
   # REPLACE WITH ACTUAL KEYS FROM LANGFUSE UI
   # Get these from: Langfuse UI → Settings → API Keys
-  LANGFUSE_PUBLIC_KEY: "pk-lf-REPLACE-ME"
-  LANGFUSE_SECRET_KEY: "sk-lf-REPLACE-ME"
+  LANGFUSE_PUBLIC_KEY: "pk-lf-04326dd9-1cfd-4f8a-b1d7-aa87414d477c"
+  LANGFUSE_SECRET_KEY: "sk-lf-88c756ad-6129-4be2-a337-1ab845e19f7e"
