@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langfuse-config
+  namespace: ambient-code
+data:
+  LANGFUSE_HOST: "http://langfuse-web.langfuse.svc.cluster.local:3000"
+  LANGFUSE_ENABLED: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: langfuse-keys
+  namespace: ambient-code
+type: Opaque
+stringData:
+  # REPLACE WITH ACTUAL KEYS FROM LANGFUSE UI
+  # Get these from: Langfuse UI → Settings → API Keys
+  LANGFUSE_PUBLIC_KEY: "pk-lf-REPLACE-ME"
+  LANGFUSE_SECRET_KEY: "sk-lf-REPLACE-ME"

@@ -586,14 +586,33 @@ func handleAgenticSessionEvent(obj *unstructured.Unstructured) error {
 							}(),
 
 							// Import secrets as environment variables
+							// - Langfuse: Optional observability configuration
 							// - integrationSecretsName: Only if exists (GIT_TOKEN, JIRA_*, custom keys)
 							// - runnerSecretsName: Only when Vertex disabled (ANTHROPIC_API_KEY)
 							EnvFrom: func() []corev1.EnvFromSource {
-								sources := []corev1.EnvFromSource{}
+								envFromSources := []corev1.EnvFromSource{
+									// Langfuse configuration (optional - won't fail if missing)
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "langfuse-keys",
+											},
+											Optional: boolPtr(true),
+										},
+									},
+									{
+										ConfigMapRef: &corev1.ConfigMapEnvSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "langfuse-config",
+											},
+											Optional: boolPtr(true),
+										},
+									},
+								}
 
 								// Only inject integration secrets if they exist (optional)
 								if integrationSecretsExist {
-									sources = append(sources, corev1.EnvFromSource{
+									envFromSources = append(envFromSources, corev1.EnvFromSource{
 										SecretRef: &corev1.SecretEnvSource{
 											LocalObjectReference: corev1.LocalObjectReference{Name: integrationSecretsName},
 										},
@@ -603,9 +622,14 @@ func handleAgenticSessionEvent(obj *unstructured.Unstructured) error {
 									log.Printf("Skipping integration secrets '%s' for session %s (not found or not configured)", integrationSecretsName, name)
 								}
 
+								// Warn if both Vertex and runnerSecretsName are configured
+								if vertexEnabled && runnerSecretsName != "" {
+									log.Printf("Warning: Both Vertex AI and runnerSecretsName configured for session %s. Using Vertex (runnerSecretsName ignored)", name)
+								}
+
 								// Only inject runner secrets (ANTHROPIC_API_KEY) when Vertex is disabled
 								if !vertexEnabled && runnerSecretsName != "" {
-									sources = append(sources, corev1.EnvFromSource{
+									envFromSources = append(envFromSources, corev1.EnvFromSource{
 										SecretRef: &corev1.SecretEnvSource{
 											LocalObjectReference: corev1.LocalObjectReference{Name: runnerSecretsName},
 										},
@@ -615,7 +639,7 @@ func handleAgenticSessionEvent(obj *unstructured.Unstructured) error {
 									log.Printf("Skipping runner secrets '%s' for session %s (Vertex enabled)", runnerSecretsName, name)
 								}
 
-								return sources
+								return envFromSources
 							}(),
 
 							Resources: corev1.ResourceRequirements{},

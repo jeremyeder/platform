@@ -22,6 +22,9 @@ from runner_shell.core.shell import RunnerShell
 from runner_shell.core.protocol import MessageType, SessionStatus, PartialInfo
 from runner_shell.core.context import RunnerContext
 
+# Langfuse instrumentation
+from langfuse import Langfuse, observe
+
 
 class ClaudeCodeAdapter:
     """Adapter that wraps the existing Claude Code CLI for runner-shell."""
@@ -33,6 +36,21 @@ class ClaudeCodeAdapter:
         self._incoming_queue: "asyncio.Queue[dict]" = asyncio.Queue()
         self._restart_requested = False
         self._first_run = True  # Track if this is the first SDK run or a mid-session restart
+
+        # Initialize Langfuse client
+        self._langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+        self._langfuse_client = None
+        if self._langfuse_enabled:
+            try:
+                self._langfuse_client = Langfuse(
+                    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+                    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+                    host=os.getenv("LANGFUSE_HOST", "http://langfuse-web.langfuse.svc.cluster.local:3000")
+                )
+                logging.info(f"Langfuse client initialized: {os.getenv('LANGFUSE_HOST')}")
+            except Exception as e:
+                logging.warning(f"Failed to initialize Langfuse: {e}")
+                self._langfuse_enabled = False
 
     async def initialize(self, context: RunnerContext):
         """Initialize the adapter with context."""
@@ -413,6 +431,28 @@ class ClaudeCodeAdapter:
                     pass
 
             result_payload = None
+            generation_span = None  # Track current generation for usage updates
+
+            # Initialize Langfuse tracing
+            trace = None
+            if self._langfuse_enabled and self._langfuse_client:
+                try:
+                    trace = self._langfuse_client.trace(
+                        name="agentic-session",
+                        session_id=self.context.session_id,
+                        input={"prompt": prompt},
+                        metadata={
+                            "namespace": os.getenv("NAMESPACE", "unknown"),
+                            "project": os.getenv("PROJECT_NAME", "unknown"),
+                            "interactive": self.context.get_env('INTERACTIVE', 'false'),
+                            "model": self.context.get_env('LLM_MODEL', 'claude-sonnet-4'),
+                            "workspace": str(self.context.workspace_path),
+                        }
+                    )
+                except Exception as e:
+                    logging.warning(f"Failed to create Langfuse trace: {e}")
+                    trace = None
+
             self._turn_count = 0
             # Import SDK message and content types for accurate mapping
             from claude_agent_sdk import (
@@ -490,6 +530,8 @@ class ClaudeCodeAdapter:
                         if text:
                             await self._send_log({"level": "debug", "message": str(text)})
                     elif isinstance(message, (ResultMessage)):
+                        nonlocal generation_span
+
                         # Only surface result envelope to UI in non-interactive mode
                         result_payload = {
                             "subtype": getattr(message, 'subtype', None),
@@ -502,6 +544,30 @@ class ClaudeCodeAdapter:
                             "usage": getattr(message, 'usage', None),
                             "result": getattr(message, 'result', None),
                         }
+
+                        # Update Langfuse generation with usage data
+                        if generation_span:
+                            try:
+                                usage_data = getattr(message, 'usage', None) or {}
+                                generation_span.update(
+                                    output={"result": getattr(message, 'result', None)},
+                                    usage={
+                                        "input": usage_data.get('input_tokens', 0),
+                                        "output": usage_data.get('output_tokens', 0),
+                                        "total": usage_data.get('total_tokens', 0),
+                                    },
+                                    metadata={
+                                        "cost_usd": getattr(message, 'total_cost_usd'),
+                                        "duration_ms": getattr(message, 'duration_ms'),
+                                        "duration_api_ms": getattr(message, 'duration_api_ms'),
+                                        "num_turns": getattr(message, 'num_turns'),
+                                    }
+                                )
+                                generation_span.end()
+                                generation_span = None  # Clear for next query
+                            except Exception as e:
+                                logging.warning(f"Failed to update Langfuse generation: {e}")
+
                         if not interactive:
                             await self.shell._send_message(
                                 MessageType.AGENT_MESSAGE,
@@ -515,7 +581,21 @@ class ClaudeCodeAdapter:
                     logging.info(f"SDK is handling session resumption for {parent_session_id}")
 
                 async def process_one_prompt(text: str):
+                    nonlocal generation_span
+
                     await self.shell._send_message(MessageType.AGENT_RUNNING, {})
+
+                    # Create Langfuse generation span for this query
+                    if trace:
+                        try:
+                            generation_span = trace.generation(
+                                name="claude-query",
+                                input={"prompt": text},
+                                model=self.context.get_env('LLM_MODEL', 'claude-sonnet-4'),
+                            )
+                        except Exception as e:
+                            logging.warning(f"Failed to create Langfuse generation: {e}")
+
                     await client.query(text)
                     await process_response_stream(client)
 
@@ -588,6 +668,29 @@ class ClaudeCodeAdapter:
 
             # Note: All output is streamed via WebSocket, not collected here
             await self._check_pr_intent("")
+
+            # Update trace with final session outcome
+            if trace:
+                try:
+                    trace.update(
+                        output={
+                            "success": True,
+                            "turns": self._turn_count,
+                        },
+                        metadata={
+                            "total_cost_usd": result_payload.get("total_cost_usd") if result_payload else None,
+                            "duration_ms": result_payload.get("duration_ms") if result_payload else None,
+                        }
+                    )
+                except Exception as e:
+                    logging.warning(f"Failed to update Langfuse trace: {e}")
+
+            # Flush Langfuse data before returning
+            if self._langfuse_enabled and self._langfuse_client:
+                try:
+                    self._langfuse_client.flush()
+                except Exception as e:
+                    logging.warning(f"Failed to flush Langfuse: {e}")
 
             # Return success - result_payload may be None if SDK didn't send ResultMessage
             # (which can happen legitimately for some operations like git push)
