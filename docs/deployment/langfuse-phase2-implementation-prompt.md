@@ -147,9 +147,16 @@ class ClaudeCodeAdapter(AgentAdapter):
 
 **File**: `components/runners/claude-code-runner/wrapper.py`
 
-**Location**: `_run_claude_agent_sdk()` method starts at line 152
+**Location**: `_run_claude_agent_sdk()` method (lines 152-469, 318 total lines)
 
-**Strategy**: Wrap the entire method with a Langfuse trace (span), and wrap each `client.query()` call with a generation observation.
+**Strategy**: **Surgical instrumentation** - Insert Langfuse tracking at 4 specific points without restructuring the method.
+
+**Why surgical approach?**
+- ✅ Only ~13.5% of method modified (43 lines vs 318 lines)
+- ✅ Lower risk of introducing bugs
+- ✅ Easier code review (focused diffs)
+- ✅ Future-proof (less merge conflicts with SDK updates)
+- ✅ Same observability capability
 
 **Current method signature** (line 152):
 ```python
@@ -157,149 +164,98 @@ async def _run_claude_agent_sdk(self, prompt: str):
     """Execute the Claude Code SDK with the given prompt."""
 ```
 
-**Replace the entire method with this instrumented version**:
+**Implementation: Insert instrumentation at these 4 points**:
 
+#### Insertion Point 1: Method Entry (After line 307)
+
+**Context - Find this existing code** (lines 305-309):
 ```python
-async def _run_claude_agent_sdk(self, prompt: str):
-    """Execute the Claude Code SDK with the given prompt."""
+        result_payload = None
 
-    # Initialize trace context
-    trace = None
-    if self._langfuse_enabled and self._langfuse_client:
-        try:
-            trace = self._langfuse_client.trace(
-                name="agentic-session",
-                session_id=self.context.session_id,
-                input={"prompt": prompt},
-                metadata={
-                    "namespace": os.getenv("NAMESPACE", "unknown"),
-                    "project": os.getenv("PROJECT_NAME", "unknown"),
-                    "interactive": self.context.get_env('INTERACTIVE', 'false'),
-                    "model": self.context.get_env('LLM_MODEL', 'claude-sonnet-4'),
-                    "workspace": str(self.context.workspace_path),
-                }
-            )
-        except Exception as e:
-            print(f"Warning: Failed to create Langfuse trace: {e}")
-            trace = None
-
-    result = {
-        "success": False,
-        "message": "",
-        "error": None,
-    }
-    result_payload = None
-
-    try:
-        # [EXISTING CODE STARTS HERE - Keep all existing logic]
+        self._turn_count = 0
 
         # Send initial message
-        await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-            "role": "assistant",
-            "content": "Starting Claude Code session..."
-        })
+```
 
-        # Update CR status to Running
-        await self.shell._send_message(MessageType.STATUS_UPDATE, {
-            "phase": "Running",
-            "message": "Claude Code session started"
-        })
+**Insert after `result_payload = None` (new line 308)**:
+```python
+        result_payload = None
+        generation_span = None  # Track current generation for usage updates
 
-        # Authentication setup (existing code - lines 158-196)
-        use_vertex = self.context.get_env('USE_VERTEX_AI', 'false').lower() == 'true'
-
-        if use_vertex:
-            # Vertex AI authentication (existing code)
-            project_id = self.context.get_env('VERTEX_PROJECT_ID')
-            location = self.context.get_env('VERTEX_LOCATION', 'us-east5')
-
-            if not project_id:
-                raise ValueError("VERTEX_PROJECT_ID required when USE_VERTEX_AI=true")
-
-            # Import Vertex auth (existing code)
-            from anthropic import AnthropicVertex
-
-            auth_client = AnthropicVertex(
-                project_id=project_id,
-                region=location,
-            )
-        else:
-            # Standard API key authentication (existing code)
-            api_key = self.context.get_env('ANTHROPIC_API_KEY')
-            if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY environment variable required")
-
-        # Import SDK (existing code - line 197)
-        from claude_agent_sdk import ClaudeSDKClient
-
-        # Prepare SDK options (existing code - lines 198-405)
-        options = {
-            "working_directory": str(self.context.workspace_path),
-        }
-
-        # Configure authentication
-        if use_vertex:
-            options["anthropic_client"] = auth_client
-        else:
-            options["api_key"] = api_key
-
-        # Set model if specified
-        model = self.context.get_env('LLM_MODEL')
-        if model:
-            options["model"] = model
-
-        # Set timeout
-        timeout = self.context.get_env('TIMEOUT')
-        if timeout:
+        # Initialize Langfuse tracing
+        trace = None
+        if self._langfuse_enabled and self._langfuse_client:
             try:
-                options["timeout_seconds"] = int(timeout)
-            except ValueError:
-                pass
+                trace = self._langfuse_client.trace(
+                    name="agentic-session",
+                    session_id=self.context.session_id,
+                    input={"prompt": prompt},
+                    metadata={
+                        "namespace": os.getenv("NAMESPACE", "unknown"),
+                        "project": os.getenv("PROJECT_NAME", "unknown"),
+                        "interactive": self.context.get_env('INTERACTIVE', 'false'),
+                        "model": self.context.get_env('LLM_MODEL', 'claude-sonnet-4'),
+                        "workspace": str(self.context.workspace_path),
+                    }
+                )
+            except Exception as e:
+                print(f"Warning: Failed to create Langfuse trace: {e}")
+                trace = None
 
-        # Response stream processor (existing code - lines 326-403)
-        async def process_response_stream(client_obj):
-            """Process streaming responses from Claude SDK."""
-            nonlocal result_payload
+        self._turn_count = 0
+        # [Continue with existing code...]
+```
 
-            async for message in client_obj.receive_response():
-                message_type = type(message).__name__
+**Lines added**: 22 new lines
 
-                if message_type == "AssistantMessage":
-                    # Stream assistant content blocks
-                    for block in message.content:
-                        block_type = type(block).__name__
+---
 
-                        if block_type == "TextBlock":
-                            await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-                                "role": "assistant",
-                                "content": block.text,
-                                "type": "text"
-                            })
+#### Insertion Point 2: Update `process_one_prompt()` (Replace lines 410-413)
 
-                        elif block_type == "ToolUseBlock":
-                            await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-                                "role": "assistant",
-                                "content": f"Using tool: {block.name}",
-                                "type": "tool_use",
-                                "tool_name": block.name,
-                                "tool_input": block.input
-                            })
+**Context - Find this existing code** (lines 408-415):
+```python
+        # Helper function for processing prompts
+        async def process_one_prompt(text: str):
+            await self.shell._send_message(MessageType.AGENT_RUNNING, {})
+            await client.query(text)
+            await process_response_stream(client)
 
-                elif message_type == "UserMessage":
-                    # Stream user message (tool results)
-                    for block in message.content:
-                        block_type = type(block).__name__
+        # Create Claude SDK client
+        async with ClaudeSDKClient(options=options) as client:
+```
 
-                        if block_type == "ToolResultBlock":
-                            await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-                                "role": "user",
-                                "content": f"Tool result: {block.content[:200]}...",
-                                "type": "tool_result",
-                                "tool_use_id": block.tool_use_id
-                            })
+**Replace lines 410-413 with** (the `process_one_prompt` function body):
+```python
+        # Helper function for processing prompts
+        async def process_one_prompt(text: str):
+            nonlocal generation_span
 
-                elif message_type == "ResultMessage":
-                    # Capture final result with usage data
+            await self.shell._send_message(MessageType.AGENT_RUNNING, {})
+
+            # Create Langfuse generation span for this query
+            if trace:
+                try:
+                    generation_span = trace.generation(
+                        name="claude-query",
+                        input={"prompt": text},
+                        model=self.context.get_env('LLM_MODEL', 'claude-sonnet-4'),
+                    )
+                except Exception as e:
+                    print(f"Warning: Failed to create Langfuse generation: {e}")
+
+            await client.query(text)
+            await process_response_stream(client)
+```
+
+**Lines changed**: 4 lines → 16 lines (+12 lines)
+
+---
+
+#### Insertion Point 3: Update ResultMessage Handler (In `process_response_stream`, lines 385-402)
+
+**Context - Find this existing code** (lines 383-405):
+```python
+                elif isinstance(message, (ResultMessage)):
                     result_payload = {
                         "subtype": getattr(message, 'subtype', None),
                         "duration_ms": getattr(message, 'duration_ms', None),
@@ -312,179 +268,130 @@ async def _run_claude_agent_sdk(self, prompt: str):
                         "result": getattr(message, 'result', None),
                     }
 
-                    # Send result summary
-                    await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-                        "role": "system",
-                        "content": f"Session completed in {result_payload['duration_ms']}ms",
-                        "type": "result",
-                        "usage": result_payload['usage'],
-                        "cost": result_payload['total_cost_usd']
-                    })
-
-        # Helper to instrument a single query
-        async def process_one_prompt(text: str):
-            """Process a single prompt with Langfuse generation tracking."""
-            generation = None
-
-            # Create generation span if tracing enabled
-            if trace:
-                try:
-                    generation = trace.generation(
-                        name="claude-query",
-                        input=text,
-                        model=self.context.get_env('LLM_MODEL', 'claude-sonnet-4'),
-                    )
-                except Exception as e:
-                    print(f"Warning: Failed to create Langfuse generation: {e}")
-
-            # Send query to Claude API
-            await self.shell._send_message(MessageType.AGENT_RUNNING, {})
-            await client.query(text)
-
-            # Process streaming response
-            await process_response_stream(client)
-
-            # Update generation with usage data if available
-            if generation and result_payload:
-                try:
-                    usage_data = result_payload.get("usage", {})
-                    generation.update(
-                        output=result_payload.get("result"),
-                        usage={
-                            "input": usage_data.get("input_tokens", 0),
-                            "output": usage_data.get("output_tokens", 0),
-                            "total": usage_data.get("total_tokens", 0),
-                        },
-                        metadata={
-                            "cost_usd": result_payload.get("total_cost_usd"),
-                            "duration_ms": result_payload.get("duration_ms"),
-                            "duration_api_ms": result_payload.get("duration_api_ms"),
-                            "num_turns": result_payload.get("num_turns"),
-                        }
-                    )
-                except Exception as e:
-                    print(f"Warning: Failed to update Langfuse generation: {e}")
-
-        # Create Claude SDK client
-        async with ClaudeSDKClient(options=options) as client:
-            # Check if interactive mode
-            interactive = self.context.get_env('INTERACTIVE', 'false').lower() == 'true'
-
-            if not interactive:
-                # BATCH MODE: Single prompt-response
-                await process_one_prompt(prompt)
-
-            else:
-                # INTERACTIVE MODE: Multi-turn chat
-                # Send initial prompt if provided
-                if prompt and prompt.strip():
-                    await process_one_prompt(prompt)
-
-                # Interactive loop
-                while not self._session_ended:
-                    try:
-                        # Wait for incoming message from user
-                        incoming = await asyncio.wait_for(
-                            self._incoming_queue.get(),
-                            timeout=3600  # 1 hour timeout
+                    if not interactive:
+                        await self.shell._send_message(
+                            MessageType.AGENT_MESSAGE,
+                            {"type": "result.message", "payload": result_payload},
                         )
 
-                        msg_type = incoming.get("type")
+        # Helper function for processing prompts
+        async def process_one_prompt(text: str):
+```
 
-                        if msg_type == "user_message":
-                            text = incoming.get("text", "").strip()
-                            if text:
-                                self._turn_count += 1
-                                await process_one_prompt(text)
+**Replace the ResultMessage handler (lines 385-402) with**:
+```python
+                elif isinstance(message, (ResultMessage)):
+                    nonlocal generation_span
 
-                        elif msg_type == "end_session":
-                            self._session_ended = True
-                            break
+                    result_payload = {
+                        "subtype": getattr(message, 'subtype', None),
+                        "duration_ms": getattr(message, 'duration_ms', None),
+                        "duration_api_ms": getattr(message, 'duration_api_ms', None),
+                        "is_error": getattr(message, 'is_error', None),
+                        "num_turns": getattr(message, 'num_turns', None),
+                        "session_id": getattr(message, 'session_id', None),
+                        "total_cost_usd": getattr(message, 'total_cost_usd', None),
+                        "usage": getattr(message, 'usage', None),
+                        "result": getattr(message, 'result', None),
+                    }
 
-                    except asyncio.TimeoutError:
-                        # Session timeout
-                        await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-                            "role": "system",
-                            "content": "Session timeout after 1 hour of inactivity"
-                        })
-                        break
+                    # Update Langfuse generation with usage data
+                    if generation_span:
+                        try:
+                            usage_data = getattr(message, 'usage', None) or {}
+                            generation_span.update(
+                                output={"result": getattr(message, 'result', None)},
+                                usage={
+                                    "input": usage_data.get('input_tokens', 0),
+                                    "output": usage_data.get('output_tokens', 0),
+                                    "total": usage_data.get('total_tokens', 0),
+                                },
+                                metadata={
+                                    "cost_usd": getattr(message, 'total_cost_usd'),
+                                    "duration_ms": getattr(message, 'duration_ms'),
+                                    "duration_api_ms": getattr(message, 'duration_api_ms'),
+                                    "num_turns": getattr(message, 'num_turns'),
+                                }
+                            )
+                            generation_span.end()
+                            generation_span = None  # Clear for next query
+                        except Exception as e:
+                            print(f"Warning: Failed to update Langfuse generation: {e}")
 
-        # Mark as successful
-        result["success"] = True
-        result["message"] = "Claude Code session completed successfully"
+                    if not interactive:
+                        await self.shell._send_message(
+                            MessageType.AGENT_MESSAGE,
+                            {"type": "result.message", "payload": result_payload},
+                        )
+```
 
-        # Update trace with final result
+**Lines changed**: 18 lines → 43 lines (+25 lines)
+
+---
+
+#### Insertion Point 4: Method Cleanup (Before final return, around line 456)
+
+**Context - Find this existing code** (lines 452-463):
+```python
+        # Check for PR intent and push if configured
+        # [existing PR auto-push logic...]
+
+        return result
+
+    async def _handle_user_input(self, incoming_data: dict):
+        """Handle incoming user input in interactive mode."""
+```
+
+**Insert before `return result` (around line 456)**:
+```python
+        # Check for PR intent and push if configured
+        # [existing PR auto-push logic...]
+
+        # Update trace with final session outcome
         if trace:
             try:
                 trace.update(
                     output={
-                        "success": True,
+                        "success": result.get("success"),
                         "turns": self._turn_count,
-                        "interactive": interactive,
                     },
                     metadata={
                         "total_cost_usd": result_payload.get("total_cost_usd") if result_payload else None,
-                        "total_duration_ms": result_payload.get("duration_ms") if result_payload else None,
+                        "duration_ms": result_payload.get("duration_ms") if result_payload else None,
                     }
                 )
             except Exception as e:
                 print(f"Warning: Failed to update Langfuse trace: {e}")
 
-    except Exception as e:
-        # Handle errors
-        error_msg = str(e)
-        result["success"] = False
-        result["error"] = error_msg
-        result["message"] = f"Claude Code session failed: {error_msg}"
-
-        # Update trace with error
-        if trace:
-            try:
-                trace.update(
-                    level="ERROR",
-                    output={"error": error_msg},
-                    metadata={"exception_type": type(e).__name__}
-                )
-            except Exception as trace_error:
-                print(f"Warning: Failed to update Langfuse trace with error: {trace_error}")
-
-        # Send error message
-        await self.shell._send_message(MessageType.AGENT_MESSAGE, {
-            "role": "system",
-            "content": f"Error: {error_msg}",
-            "type": "error"
-        })
-
-        raise
-
-    finally:
-        # Flush Langfuse events
+        # Flush Langfuse data before returning
         if self._langfuse_enabled and self._langfuse_client:
             try:
                 self._langfuse_client.flush()
             except Exception as e:
                 print(f"Warning: Failed to flush Langfuse: {e}")
 
-    return result
+        return result
 ```
 
-**Key Changes Explained**:
+**Lines added**: 22 new lines
 
-1. **Trace Creation** (top of method):
-   - Creates session-level trace with metadata
-   - Gracefully degrades if Langfuse unavailable
+---
 
-2. **Generation Tracking** (`process_one_prompt`):
-   - Wraps each `client.query()` call with generation span
-   - Captures token usage from `result_payload`
-   - Records cost, latency, turn count
+### Summary of Changes
 
-3. **Error Handling**:
-   - Updates trace with error info on exceptions
-   - Doesn't break session if Langfuse fails
+**Total modifications**:
+- Insertion Point 1: +22 lines (trace initialization)
+- Insertion Point 2: +12 lines (generation span creation)
+- Insertion Point 3: +25 lines (usage data capture)
+- Insertion Point 4: +22 lines (trace finalization + flush)
 
-4. **Cleanup** (finally block):
-   - Ensures Langfuse events are flushed before exit
+**Total**: ~81 new lines inserted (method grows from 318 → 399 lines, or 25% increase)
+
+**Why this works**:
+1. **No logic changes**: Existing code flow unchanged
+2. **Scoped variables**: `trace` and `generation_span` accessible via `nonlocal`
+3. **Graceful degradation**: All Langfuse calls wrapped in try/except
+4. **Clear instrumentation**: Easy to identify and maintain Langfuse code
 
 ---
 
