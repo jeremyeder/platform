@@ -38,26 +38,8 @@ LANGFUSE_URL=http://langfuse.local
 
 ## Phase 2 Integration Points
 
-### Components Requiring Instrumentation
+### Claude Code Runner (Python)
 
-#### 1. Backend API (Go)
-**Path**: `components/backend/`
-**Language**: Go + Gin framework
-**LLM Integration**: Anthropic API calls (via service account or user tokens)
-
-**Key Files**:
-- `handlers/sessions.go` - AgenticSession lifecycle, creates Jobs
-- `git.go`, `github/` - Git operations (not LLM-related)
-- `types/` - Type definitions
-
-**What to Instrument**:
-- ❌ Backend doesn't make direct LLM calls (operator spawns Jobs)
-- ✅ Could track session metadata, job creation events
-- ✅ Useful for understanding session → job → execution flow
-
-**Go SDK**: https://github.com/langfuse/langfuse-go
-
-#### 2. Claude Code Runner (Python)
 **Path**: `components/runners/claude-code-runner/`
 **Language**: Python
 **LLM Integration**: Claude Code SDK (`claude-code-sdk>=0.0.23`)
@@ -75,19 +57,14 @@ LANGFUSE_URL=http://langfuse.local
 
 **Python SDK**: `pip install langfuse`
 
-#### 3. Operator (Go)
-**Path**: `components/operator/`
-**Language**: Go
-**LLM Integration**: None direct
+**Why Runner Only?**
+- Backend and operator don't make direct LLM calls
+- Runner is where actual Anthropic API interactions happen
+- Simplest path to observability value
+- Backend/operator instrumentation can be added in Phase 3 (see `langfuse-phase3-ideas.md`)
 
-**What to Instrument**:
-- ✅ Job creation events
-- ✅ Session phase transitions (Pending → Running → Completed)
-- ✅ Error tracking and retry logic
+### Langfuse SDK Integration (Python)
 
-### Langfuse SDK Integration
-
-#### Python (Claude Code Runner)
 ```python
 from langfuse import Langfuse
 
@@ -114,41 +91,10 @@ generation = trace.generation(
 )
 ```
 
-#### Go (Backend/Operator)
-```go
-import "github.com/langfuse/langfuse-go"
-
-client := langfuse.NewClient(
-    langfuse.WithPublicKey(os.Getenv("LANGFUSE_PUBLIC_KEY")),
-    langfuse.WithSecretKey(os.Getenv("LANGFUSE_SECRET_KEY")),
-    langfuse.WithBaseURL(os.Getenv("LANGFUSE_HOST")),
-)
-
-// Track session lifecycle
-trace := client.CreateTrace(langfuse.TraceParams{
-    Name:      "agentic-session-lifecycle",
-    SessionID: sessionName,
-    Metadata:  map[string]interface{}{"namespace": ns, "phase": phase},
-})
-```
-
 ### Configuration Strategy
 
-#### Option 1: ProjectSettings CR Extension
-Add Langfuse configuration to existing `ProjectSettings` CRD:
+Phase 2 uses a **single global configuration** with ConfigMap + Secret in the `ambient-code` namespace:
 
-```yaml
-apiVersion: vteam.ambient-code/v1alpha1
-kind: ProjectSettings
-spec:
-  langfuse:
-    enabled: true
-    host: "http://langfuse-web.langfuse.svc.cluster.local:3000"
-    publicKey: <from-secret>
-    secretKey: <from-secret>
-```
-
-#### Option 2: Separate ConfigMap + Secret
 ```yaml
 # ConfigMap for non-sensitive config
 apiVersion: v1
@@ -173,22 +119,13 @@ stringData:
   LANGFUSE_SECRET_KEY: "sk-lf-..."
 ```
 
-#### Option 3: Per-Project Isolation
-Each project namespace gets its own Langfuse project:
+**Why Global Config?**
+- Simplest path to get instrumentation working
+- All runner jobs reference same ConfigMap/Secret
+- Easy to manage and update
+- Sufficient for initial deployment
 
-```yaml
-# In namespace: project-foo
-apiVersion: v1
-kind: Secret
-metadata:
-  name: langfuse-keys
-  namespace: project-foo
-stringData:
-  LANGFUSE_PUBLIC_KEY: "pk-lf-project-foo-..."
-  LANGFUSE_SECRET_KEY: "sk-lf-project-foo-..."
-```
-
-**Recommendation**: Start with Option 2 (global config), migrate to Option 3 for multi-tenancy.
+**Multi-tenancy**: Per-project isolation can be added in Phase 3 (see `langfuse-phase3-ideas.md`)
 
 ## Implementation Plan
 
@@ -248,8 +185,10 @@ def main():
     langfuse.flush()
 ```
 
-### Step 4: Update Runner Job Template
+### Step 4: Configure Operator to Pass Langfuse Config to Runner Jobs
 **File**: `components/operator/internal/handlers/sessions.go`
+
+**Note**: This doesn't instrument the operator itself - it configures the operator to inject Langfuse credentials into runner Job pods.
 
 Add environment variables to Job spec:
 ```go
@@ -296,47 +235,38 @@ echo "     -n $NAMESPACE"
 3. Check token usage, latency tracking
 4. Validate session metadata propagation
 
-## Metrics to Track
+## Metrics to Track (MVP)
 
-### Session-Level Metrics
-- Total sessions created
+Phase 2 focuses on essential observability metrics:
+
+### Session Metrics
 - Success/failure rates
-- Average session duration
-- Token usage per session
-- Cost per session
+- Session duration (start to completion)
 
 ### LLM Metrics
-- Model used (Sonnet/Haiku)
-- Input/output tokens
-- Latency (time to first token, total time)
-- API errors and retries
-- Temperature and other parameters
+- Model used (Sonnet/Haiku/Opus)
+- Token usage (input/output tokens per request)
+- Basic latency (total request time)
 
-### Business Metrics
-- Sessions per project
-- Most common prompts/use cases
-- User satisfaction (via Langfuse scores)
-- Cost optimization opportunities
+**Advanced metrics** (cost attribution, detailed latency breakdown, user satisfaction scores) can be added in Phase 3.
 
 ## Testing Strategy
 
-### Unit Tests
-- Mock Langfuse client in tests
-- Verify trace creation with correct metadata
-- Test graceful degradation when Langfuse unavailable
+Focus on **integration testing** to validate Phase 2:
 
 ### Integration Tests
-- Deploy with Langfuse enabled
-- Create test sessions
-- Query Langfuse API for traces
-- Validate data accuracy
+1. Deploy platform with Langfuse enabled
+2. Create test AgenticSession with simple prompt
+3. Query Langfuse API: `GET /api/public/traces`
+4. Verify trace data:
+   - Session metadata (namespace, project name)
+   - Token usage captured
+   - Model name recorded
+   - Session duration tracked
 
-### E2E Tests
-Update `e2e/` tests:
-- Deploy Langfuse alongside platform
-- Run session creation tests
-- Verify traces in Langfuse
-- Test multi-project isolation
+**Success**: Trace appears in Langfuse UI with correct metadata and token counts.
+
+**Note**: Unit tests and comprehensive E2E testing can be added in Phase 3 if needed.
 
 ## Documentation Updates
 
@@ -355,31 +285,30 @@ Update `e2e/` tests:
 ## Success Criteria
 
 Phase 2 is complete when:
-- ✅ Claude Code Runner traces all LLM calls
-- ✅ Session metadata visible in Langfuse
-- ✅ Token usage and costs tracked accurately
-- ✅ Multi-project isolation working
-- ✅ Documentation updated
-- ✅ E2E tests passing with instrumentation
-- ✅ Performance impact < 5% overhead
+- ✅ Claude Code Runner traces all LLM calls to Langfuse
+- ✅ Session metadata visible in Langfuse UI (namespace, project, model)
+- ✅ Token usage tracked accurately (input/output tokens)
+- ✅ Integration test passes (trace appears in Langfuse)
+- ✅ Basic documentation updated
+- ✅ No significant performance degradation (< 5% overhead)
 
-## Future Enhancements (Phase 3+)
+## Future Enhancements
 
-- **Feedback Loop**: Collect user ratings on session outputs
-- **Prompt Management**: Version and A/B test prompts via Langfuse
-- **Dataset Creation**: Build evaluation datasets from sessions
-- **Automated Evaluation**: Score session quality automatically
-- **Cost Alerts**: Notify when project exceeds budget
-- **Fine-tuning**: Use traces to fine-tune models
-- **ROSA Deployment**: Deploy Langfuse to production ROSA cluster
+See `langfuse-phase3-ideas.md` for advanced features including:
+- Backend/Operator instrumentation
+- Per-project multi-tenancy
+- Feedback loops and user ratings
+- Prompt management and A/B testing
+- Automated evaluation and cost alerts
+- ROSA production deployment
 
 ## References
 
 - **Langfuse Documentation**: https://langfuse.com/docs
 - **Python SDK**: https://langfuse.com/docs/sdk/python
-- **Go SDK**: https://github.com/langfuse/langfuse-go
 - **Claude Code SDK**: https://github.com/anthropics/claude-code-sdk-python
 - **Phase 1 PR**: https://github.com/jeremyeder/platform/pull/30
+- **Phase 3 Ideas**: `langfuse-phase3-ideas.md`
 
 ## Branch Information
 
