@@ -1,0 +1,391 @@
+openapi: 3.0.3
+info:
+  title: Background Coding Agent API
+  description: REST API for managing background coding tasks in vTeam platform
+  version: 1.0.0
+  contact:
+    name: vTeam API Support
+
+servers:
+  - url: /api/projects/{projectName}
+    description: Project-scoped API endpoints
+    variables:
+      projectName:
+        default: default
+        description: Project (namespace) name
+
+security:
+  - bearerAuth: []
+
+paths:
+  /background-tasks:
+    post:
+      summary: Create background task
+      operationId: createBackgroundTask
+      tags: [BackgroundTasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBackgroundTaskRequest'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackgroundTaskResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/ConcurrencyLimitReached'
+
+    get:
+      summary: List background tasks
+      operationId: listBackgroundTasks
+      tags: [BackgroundTasks]
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/CreatorFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of background tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackgroundTaskList'
+
+  /background-tasks/{taskName}:
+    get:
+      summary: Get background task details
+      operationId: getBackgroundTask
+      tags: [BackgroundTasks]
+      parameters:
+        - $ref: '#/components/parameters/TaskName'
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackgroundTaskDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /background-tasks/{taskName}/retry:
+    post:
+      summary: Retry failed background task
+      operationId: retryBackgroundTask
+      tags: [BackgroundTasks]
+      parameters:
+        - $ref: '#/components/parameters/TaskName'
+      responses:
+        '200':
+          description: Task retried successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackgroundTaskResponse'
+        '400':
+          description: Task not in failed state
+        '409':
+          $ref: '#/components/responses/ConcurrencyLimitReached'
+
+  /background-tasks/{taskName}/cancel:
+    post:
+      summary: Cancel running background task
+      operationId: cancelBackgroundTask
+      tags: [BackgroundTasks]
+      parameters:
+        - $ref: '#/components/parameters/TaskName'
+      responses:
+        '200':
+          description: Task cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [Stopped]
+        '400':
+          description: Task not in running state
+
+  /task-templates:
+    post:
+      summary: Create task template
+      operationId: createTaskTemplate
+      tags: [TaskTemplates]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskTemplateRequest'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskTemplateResponse'
+
+    get:
+      summary: List task templates
+      operationId: listTaskTemplates
+      tags: [TaskTemplates]
+      responses:
+        '200':
+          description: List of task templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskTemplateList'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TaskName:
+      name: taskName
+      in: path
+      required: true
+      schema:
+        type: string
+    StatusFilter:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [Pending, Creating, Running, Completed, Failed, Stopped, Timeout]
+    CreatorFilter:
+      name: creator
+      in: query
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  schemas:
+    CreateBackgroundTaskRequest:
+      type: object
+      required: [name, instructions, repository]
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          maxLength: 253
+        instructions:
+          type: string
+          maxLength: 10240
+        repository:
+          type: object
+          required: [url, branch]
+          properties:
+            url:
+              type: string
+              format: uri
+            branch:
+              type: string
+        templateId:
+          type: string
+          maxLength: 253
+        parameters:
+          type: object
+          additionalProperties: true
+
+    BackgroundTaskResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        uid:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Creating, Running, Completed, Failed, Stopped, Timeout]
+        createdAt:
+          type: string
+          format: date-time
+        retryCount:
+          type: integer
+
+    BackgroundTaskList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+              progress:
+                type: integer
+                minimum: 0
+                maximum: 100
+              currentPhase:
+                type: string
+              repository:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+        total:
+          type: integer
+
+    BackgroundTaskDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+        progress:
+          type: integer
+        currentPhase:
+          type: string
+        logs:
+          type: string
+        prUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        error:
+          type: string
+
+    CreateTaskTemplateRequest:
+      type: object
+      required: [name, displayName, instructionsTemplate, parameters]
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+        displayName:
+          type: string
+          maxLength: 128
+        description:
+          type: string
+          maxLength: 1024
+        instructionsTemplate:
+          type: string
+          maxLength: 10240
+        parameters:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required: [name, type, required]
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                enum: [string, boolean, integer]
+              required:
+                type: boolean
+              defaultValue:
+                type: string
+              validationRegex:
+                type: string
+
+    TaskTemplateResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        uid:
+          type: string
+
+    TaskTemplateList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              displayName:
+                type: string
+              description:
+                type: string
+              usageCount:
+                type: integer
+              lastUsed:
+                type: string
+                format: date-time
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    Forbidden:
+      description: User lacks project access
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    ConcurrencyLimitReached:
+      description: User already has running background task
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
