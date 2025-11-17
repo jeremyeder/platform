@@ -35,15 +35,25 @@ theme:
     - search.highlight
     - search.suggest
     - content.code.annotate
+    - content.code.copy
 
 nav:
   - Home: index.md
   - User Guide:
     - Overview: user-guide/index.md
     - Getting Started: user-guide/getting-started.md
+    - Working with Amber: user-guide/working-with-amber.md
   - Labs:
     - Overview: labs/index.md
-    - Lab 1 - Your First Agentic Session: labs/basic/lab-1-first-rfe.md
+    - Hello ACP:
+      - Introduction: labs/hello-acp/index.md
+      - Lab 1 - Your First Session: labs/hello-acp/01-first-session.md
+      - Lab 2 - AI That Writes Code: labs/hello-acp/02-hello-code.md
+      - Lab 3 - Multi-Repo Operations: labs/hello-acp/03-multi-repo.md
+      - Lab 4 - The 7-Agent Council: labs/hello-acp/04-hello-rfe.md
+      - Lab 5 - Chat With Your AI: labs/hello-acp/05-interactive.md
+    - Basic Labs:
+      - Lab 1 - Your First Agentic Session: labs/basic/lab-1-first-rfe.md
   - Testing:
     - E2E Testing Guide: testing/e2e-guide.md
   - Reference:
@@ -65,6 +75,10 @@ markdown_extensions:
   - attr_list
   - codehilite
   - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
