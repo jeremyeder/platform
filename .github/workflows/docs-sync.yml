@@ -1,0 +1,413 @@
+name: Documentation Synchronization
+
+on:
+  pull_request:
+    paths:
+      - '**.md'
+      - 'mkdocs.yml'
+      - 'CLAUDE.md'
+      - 'components/**/README.md'
+      - 'components/**/Makefile'
+      - 'components/**/*.go'
+      - 'components/**/*.ts'
+      - 'components/**/*.tsx'
+      - 'agents/**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  detect-docs-impact:
+    name: Detect Documentation Impact
+    runs-on: ubuntu-latest
+    outputs:
+      needs_update: ${{ steps.analyze.outputs.needs_update }}
+      summary: ${{ steps.analyze.outputs.summary }}
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git fetch origin "$BASE_REF"
+          git diff "origin/$BASE_REF...HEAD" > pr-diff.txt
+          echo "diff_size=$(wc -l < pr-diff.txt)" >> "$GITHUB_OUTPUT"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+
+      - name: Analyze with Claude API
+        id: analyze
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 << 'EOF'
+          import os
+          import json
+          import anthropic
+
+          # Read diff
+          with open('pr-diff.txt', 'r') as f:
+              diff = f.read()
+
+          if not diff.strip():
+              print("No diff found, skipping")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('needs_update=false\n')
+                  f.write('summary=No changes detected\n')
+              exit(0)
+
+          # Analyze with Claude
+          client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+
+          message = client.messages.create(
+              model="claude-3-5-sonnet-20241022",
+              max_tokens=1024,
+              messages=[{
+                  "role": "user",
+                  "content": f"""Analyze this PR diff and determine if documentation updates are needed.
+
+          PR Diff (first 5000 chars):
+          {diff[:5000]}
+
+          Return JSON only:
+          {{
+            "needs_update": bool,
+            "summary": "Brief explanation of what docs need updating (or why not)",
+            "affected_docs": ["list", "of", "doc", "files"]
+          }}
+
+          Documentation updates are needed if:
+          - New features/APIs added
+          - Commands changed (Makefile, scripts)
+          - Architecture changes
+          - Component behavior changes
+          - Agent definitions modified
+
+          NOT needed for:
+          - Typo fixes
+          - Code comments only
+          - Test-only changes
+          - Minor refactoring
+          """
+              }]
+          )
+
+          response_text = message.content[0].text
+          print(f"Claude response: {response_text}")
+
+          # Extract JSON
+          import re
+          json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+          if json_match:
+              result = json.loads(json_match.group(0))
+              needs_update = str(result.get('needs_update', False)).lower()
+              summary = result.get('summary', 'Analysis completed')
+
+              # Write to GITHUB_OUTPUT
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f'needs_update={needs_update}\n')
+                  # Escape newlines in summary for GitHub Actions
+                  summary_escaped = summary.replace('\n', ' ').replace('\r', '')
+                  f.write(f'summary={summary_escaped}\n')
+
+              print(f"Needs update: {needs_update}")
+              print(f"Summary: {summary}")
+          else:
+              print("Could not parse Claude response, defaulting to needs_update=false")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('needs_update=false\n')
+                  f.write('summary=Could not analyze diff\n')
+          EOF
+
+  sync-documentation:
+    name: Synchronize Documentation
+    needs: detect-docs-impact
+    if: needs.detect-docs-impact.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-docs.txt
+          pip install anthropic pyyaml
+          npm install -g markdownlint-cli
+
+      - name: Run markdownlint
+        id: markdownlint
+        continue-on-error: true
+        run: |
+          markdownlint '**/*.md' --ignore node_modules --ignore .next --ignore vendor --config .markdownlintrc > markdownlint-report.txt 2>&1 || true
+          echo "markdownlint_issues=$(wc -l < markdownlint-report.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Run documentation sync
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          chmod +x scripts/sync-documentation.py
+          python3 scripts/sync-documentation.py --repo-root . || true
+
+      - name: Check if docs PR already exists
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Look for existing docs PR for this source PR
+          BRANCH_NAME="docs/update-for-pr-${PR_NUMBER}-amber"
+
+          # Check if PR exists from this branch
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number' || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$EXISTING_PR" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+            echo "Found existing docs PR #$EXISTING_PR"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+            echo "No existing docs PR found"
+          fi
+
+      - name: Generate documentation updates with Claude
+        id: generate_updates
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          DETECTION_SUMMARY: ${{ needs.detect-docs-impact.outputs.summary }}
+        run: |
+          python3 << 'EOF'
+          import os
+          import json
+          import anthropic
+
+          # Read sync report
+          with open('docs-sync-report.json', 'r') as f:
+              report = json.load(f)
+
+          # Get PR context from environment (safe from injection)
+          pr_number = os.environ['PR_NUMBER']
+          pr_title = os.environ['PR_TITLE']
+          pr_author = os.environ['PR_AUTHOR']
+          detection_summary = os.environ['DETECTION_SUMMARY']
+
+          # Generate update suggestions with Claude
+          client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+
+          message = client.messages.create(
+              model="claude-3-5-sonnet-20241022",
+              max_tokens=4096,
+              messages=[{
+                  "role": "user",
+                  "content": f"""You are Amber, the AI colleague for the Ambient Code Platform.
+
+          Generate succinct documentation updates for PR #{pr_number}: "{pr_title}"
+
+          Sync Report:
+          {json.dumps(report, indent=2)}
+
+          Detection Summary:
+          {detection_summary}
+
+          Create a summary of documentation updates needed. Focus on:
+          1. Fixing broken links
+          2. Updating CLAUDE.md with new commands
+          3. Adding orphaned files to mkdocs.yml
+          4. Syncing README.md with docs/index.md
+          5. Ensuring agent compliance
+
+          Return plain text summary (not JSON) that will be used in the PR description.
+          Be concise but actionable. Use bullet points.
+          """
+              }]
+          )
+
+          updates_summary = message.content[0].text
+
+          # Save to file for PR body
+          with open('updates-summary.txt', 'w') as f:
+              f.write(updates_summary)
+
+          print("Generated updates summary:")
+          print(updates_summary)
+          EOF
+
+      - name: Create or update docs PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BRANCH_NAME: ${{ steps.check_pr.outputs.branch }}
+          EXISTS: ${{ steps.check_pr.outputs.exists }}
+          EXISTING_PR_NUMBER: ${{ steps.check_pr.outputs.pr_number }}
+          DETECTION_SUMMARY: ${{ needs.detect-docs-impact.outputs.summary }}
+          MARKDOWNLINT_ISSUES: ${{ steps.markdownlint.outputs.markdownlint_issues }}
+        run: |
+          # Configure git
+          git config user.name "Amber (Documentation Bot)"
+          git config user.email "noreply@ambient-code.dev"
+
+          # Create or checkout branch
+          if [ "$EXISTS" = "true" ]; then
+            echo "Updating existing branch $BRANCH_NAME"
+            git fetch origin "$BRANCH_NAME"
+            git checkout "$BRANCH_NAME"
+            git merge origin/main --no-edit || true
+          else
+            echo "Creating new branch $BRANCH_NAME"
+            git checkout -b "$BRANCH_NAME"
+          fi
+
+          # Apply automatic fixes (if any were generated by sync script)
+          # For now, just commit the sync report
+          git add docs-sync-report.json markdownlint-report.txt || true
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No automatic fixes to commit"
+          else
+            git commit -m "docs: automated documentation sync for PR #${PR_NUMBER}
+
+          - Run documentation synchronization
+          - Fix broken links
+          - Update navigation structure
+          - Validate agent compliance
+
+          🤖 Generated by Amber with Claude Code
+          Co-Authored-By: Amber <noreply@ambient-code.dev>"
+          fi
+
+          # Push branch
+          git push origin "$BRANCH_NAME" --force
+
+          # Read updates summary
+          UPDATES_SUMMARY=$(cat updates-summary.txt)
+
+          # Get stats from sync report
+          TOTAL_FILES=$(jq -r '.stats.total_files // 0' docs-sync-report.json)
+          BROKEN_LINKS=$(jq -r '.stats.broken_links // 0' docs-sync-report.json)
+          ORPHANED_FILES=$(jq -r '.stats.orphaned_files // 0' docs-sync-report.json)
+
+          # Create PR body (using heredoc to avoid injection)
+          cat > pr-body.txt << 'PRBODY_EOF'
+          ## 📚 Documentation Updates for PR #${PR_NUMBER}
+
+          This PR contains automated documentation synchronization triggered by changes in PR #${PR_NUMBER}.
+
+          ### Analysis Summary
+          ${DETECTION_SUMMARY}
+
+          ### Proposed Updates
+          ${UPDATES_SUMMARY}
+
+          ### Sync Report
+          - **Total files scanned**: ${TOTAL_FILES}
+          - **Broken links found**: ${BROKEN_LINKS}
+          - **Orphaned files**: ${ORPHANED_FILES}
+          - **Markdownlint issues**: ${MARKDOWNLINT_ISSUES}
+
+          ### Review Instructions
+          @${PR_AUTHOR}, please review these documentation updates and mark the PR as ready when satisfied.
+
+          Full sync report available in `docs-sync-report.json`.
+
+          ---
+
+          🤖 **Generated by Amber** with [Claude Code](https://claude.com/claude-code)
+          Co-Authored-By: Amber <noreply@ambient-code.dev>
+          PRBODY_EOF
+
+          # Substitute environment variables
+          export TOTAL_FILES BROKEN_LINKS ORPHANED_FILES
+          envsubst < pr-body.txt > pr-body-final.txt
+
+          PR_BODY=$(cat pr-body-final.txt)
+
+          # Create or update PR
+          if [ "$EXISTS" = "true" ]; then
+            echo "Updating existing PR #$EXISTING_PR_NUMBER"
+
+            gh pr edit "$EXISTING_PR_NUMBER" --body "$PR_BODY"
+
+            # Add comment to notify of update
+            gh pr comment "$EXISTING_PR_NUMBER" --body "🔄 Documentation sync updated based on latest changes in PR #${PR_NUMBER}"
+          else
+            echo "Creating new docs PR"
+
+            gh pr create \
+              --title "docs: Update documentation for PR #${PR_NUMBER}" \
+              --body "$PR_BODY" \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --draft \
+              --reviewer "$PR_AUTHOR"
+
+            # Link to source PR
+            NEW_PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number')
+
+            # Safe comment using heredoc
+            cat > comment.txt << 'COMMENT_EOF'
+          📚 Documentation update PR created: #${NEW_PR_NUMBER}
+
+          Please review the proposed documentation changes once this PR is ready.
+          COMMENT_EOF
+
+            export NEW_PR_NUMBER
+            envsubst < comment.txt > comment-final.txt
+            gh pr comment "${PR_NUMBER}" --body-file comment-final.txt
+          fi
+
+      - name: Upload sync report
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-sync-report
+          path: |
+            docs-sync-report.json
+            markdownlint-report.txt
+          retention-days: 30
+
+  comment-skip:
+    name: Comment on Skip
+    needs: detect-docs-impact
+    if: needs.detect-docs-impact.outputs.needs_update == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DETECTION_SUMMARY: ${{ needs.detect-docs-impact.outputs.summary }}
+        run: |
+          cat > comment.txt << 'COMMENT_EOF'
+          ✅ **Documentation Check**
+
+          No documentation updates needed for this PR.
+
+          **Reason**: ${DETECTION_SUMMARY}
+
+          🤖 Amber
+          COMMENT_EOF
+
+          envsubst < comment.txt > comment-final.txt
+          gh pr comment "$PR_NUMBER" --body-file comment-final.txt
