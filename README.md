@@ -14,6 +14,20 @@ The **Ambient Code Platform** is an AI automation platform that combines Claude 
 - **Multi-Agent Workflows**: Specialized AI agents model realistic software team dynamics
 - **Kubernetes Native**: Built with Custom Resources, Operators, and proper RBAC for enterprise deployment
 - **Real-time Monitoring**: Live status updates and job execution tracking
+- **🤖 Amber Background Agent**: Automated issue-to-PR workflows via GitHub Actions ([quickstart](docs/amber-quickstart.md))
+
+### Amber: Self-Service Automation
+
+**Amber** is a background agent that handles GitHub issues automatically:
+
+- 🤖 **Auto-Fix**: Create issue with `amber:auto-fix` label → Amber creates PR with linting/formatting fixes
+- 🔧 **Refactoring**: Label issue `amber:refactor` → Amber breaks large files, extracts patterns
+- 🧪 **Test Coverage**: Use `amber:test-coverage` → Amber adds missing tests
+
+**Quick Links**:
+- [5-Minute Quickstart](docs/amber-quickstart.md)
+- [Complete Guide](docs/amber-automation.md)
+- [Create Auto-Fix Issue](../../issues/new?template=amber-auto-fix.yml)
 
 ## Architecture
 
@@ -479,6 +493,13 @@ cd e2e
 The e2e tests deploy the complete vTeam stack to a kind (Kubernetes in Docker) cluster and verify core functionality including project creation and UI navigation. Tests run automatically in GitHub Actions on every PR.
 
 See [e2e/README.md](e2e/README.md) for detailed documentation, troubleshooting, and development guide.
+
+## Agent Strategy for Pilot
+- To ensure maximum focus and efficiency for the current RFE (Request for Enhancement) pilot, we are temporarily streamlining the active agent pool.
+- Active Agents (Focused Scope): The 5 agents required for this specific RFE workflow are currently located in the agents folder.
+- Agent Bullpen (Holding Pattern): All remaining agent definitions have been relocated to the "agent bullpen" folder. This transition does not signify the deprecation of any roles.
+- Future Planning: Agents in the "agent bullpen" are designated for future reintegration and will be actively utilized as we expand to address subsequent processes and workflows across the organization.
+
 
 ### Documentation
 

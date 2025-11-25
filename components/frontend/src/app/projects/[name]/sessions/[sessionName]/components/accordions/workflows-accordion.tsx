@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Loader2, Workflow, ChevronDown, ChevronRight, Sparkles, Info, AlertCircle } from "lucide-react";
+import { Play, Loader2, Workflow, ChevronDown, ChevronRight, Info, AlertCircle } from "lucide-react";
 import { AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WorkflowConfig } from "../../lib/types";
 
@@ -25,14 +23,10 @@ type WorkflowsAccordionProps = {
   workflowActivating: boolean;
   workflowMetadata?: WorkflowMetadata;
   ootbWorkflows: WorkflowConfig[];
-  selectedAgents: string[];
-  autoSelectAgents: boolean;
   isExpanded: boolean;
   onWorkflowChange: (value: string) => void;
   onActivateWorkflow: () => void;
   onCommandClick: (slashCommand: string) => void;
-  onSetSelectedAgents: (agents: string[]) => void;
-  onSetAutoSelectAgents: (auto: boolean) => void;
   onResume?: () => void;
 };
 
@@ -44,14 +38,10 @@ export function WorkflowsAccordion({
   workflowActivating,
   workflowMetadata,
   ootbWorkflows,
-  selectedAgents,
-  autoSelectAgents,
   isExpanded,
   onWorkflowChange,
   onActivateWorkflow,
   onCommandClick,
-  onSetSelectedAgents,
-  onSetAutoSelectAgents,
   onResume,
 }: WorkflowsAccordionProps) {
   const [showCommandsList, setShowCommandsList] = useState(false);
@@ -64,13 +54,13 @@ export function WorkflowsAccordion({
   const isSessionStopped = sessionPhase === 'Stopped' || sessionPhase === 'Error' || sessionPhase === 'Completed';
 
   return (
-    <AccordionItem value="workflows" className="border rounded-lg px-3 bg-white">
+    <AccordionItem value="workflows" className="border rounded-lg px-3 bg-card">
       <AccordionTrigger className="text-base font-semibold hover:no-underline py-3">
         <div className="flex items-center gap-2">
           <Workflow className="h-4 w-4" />
           <span>Workflows</span>
           {activeWorkflow && !isExpanded && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800">
               {ootbWorkflows.find(w => w.id === activeWorkflow)?.name || "Custom Workflow"}
             </Badge>
           )}
@@ -114,9 +104,9 @@ export function WorkflowsAccordion({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">
-                        <div className="flex flex-col items-start gap-0.5 py-1">
+                        <div className="flex flex-col items-start gap-0.5 py-1 max-w-[400px]">
                           <span>General chat</span>
-                          <span className="text-xs text-muted-foreground font-normal">
+                          <span className="text-xs text-muted-foreground font-normal line-clamp-2">
                             A general chat session with no structured workflow.
                           </span>
                         </div>
@@ -127,9 +117,9 @@ export function WorkflowsAccordion({
                           value={workflow.id}
                           disabled={!workflow.enabled}
                         >
-                          <div className="flex flex-col items-start gap-0.5 py-1">
+                          <div className="flex flex-col items-start gap-0.5 py-1 max-w-[400px]">
                             <span>{workflow.name}</span>
-                            <span className="text-xs text-muted-foreground font-normal">
+                            <span className="text-xs text-muted-foreground font-normal line-clamp-2">
                               {workflow.description}
                             </span>
                           </div>
@@ -137,9 +127,9 @@ export function WorkflowsAccordion({
                       ))}
                       <SelectSeparator />
                       <SelectItem value="custom">
-                        <div className="flex flex-col items-start gap-0.5 py-1">
+                        <div className="flex flex-col items-start gap-0.5 py-1 max-w-[400px]">
                           <span>Custom workflow...</span>
-                          <span className="text-xs text-muted-foreground font-normal">
+                          <span className="text-xs text-muted-foreground font-normal line-clamp-2">
                             Load a workflow from a custom Git repository
                           </span>
                         </div>
@@ -282,28 +272,12 @@ export function WorkflowsAccordion({
 
                       {showAgentsList && (
                         <div className="mt-2 pt-2 mx-3 space-y-2">
-                          {/* Auto-select checkbox */}
-                          <div className="flex items-center space-x-2 pb-2">
-                            <Checkbox
-                              id="auto-select-agents"
-                              checked={autoSelectAgents}
-                              onCheckedChange={(checked) => {
-                                onSetAutoSelectAgents(!!checked);
-                                if (checked) onSetSelectedAgents([]);
-                              }}
-                            />
-                            <Sparkles className="h-3 w-3 text-purple-500" />
-                            <Label htmlFor="auto-select-agents" className="text-sm font-normal cursor-pointer">
-                              Automatically select recommended agents for each task
-                            </Label>
-                          </div>
-                          
                           {/* Scrollable agents list */}
                           <div className="relative">
                             {agentsScrollTop && (
                               <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
                             )}
-                            <div 
+                            <div
                               className="max-h-48 overflow-y-auto space-y-1 pr-1"
                               onScroll={(e) => {
                                 const target = e.currentTarget;
@@ -316,28 +290,13 @@ export function WorkflowsAccordion({
                               <div className="space-y-1 space-x-6">
                                 {workflowMetadata.agents.map((agent) => (
                                   <div key={agent.id} className="flex items-center gap-2 group">
-                                    <Checkbox
-                                      id={`agent-${agent.id}`}
-                                      checked={selectedAgents.includes(agent.id)}
-                                      disabled={autoSelectAgents}
-                                      onCheckedChange={(checked) => {
-                                        if (checked) {
-                                          onSetSelectedAgents([...selectedAgents, agent.id]);
-                                        } else {
-                                          onSetSelectedAgents(selectedAgents.filter(id => id !== agent.id));
-                                        }
-                                      }}
-                                    />
-                                    <Label
-                                      htmlFor={`agent-${agent.id}`}
-                                      className="text-sm font-normal cursor-pointer"
-                                    >
+                                    <span className="text-sm font-normal">
                                       {agent.name}
-                                    </Label>
+                                    </span>
                                     <Popover>
                                       <PopoverTrigger asChild>
                                         <button
-                                          className="p-0.5 hover:bg-gray-100 rounded flex-shrink-0"
+                                          className="p-0.5 hover:bg-muted rounded flex-shrink-0"
                                           onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
