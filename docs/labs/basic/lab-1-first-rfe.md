@@ -2,7 +2,7 @@
 
 ## Objective 🎯
 
-Learn to create and monitor an AgenticSession using vTeam's web interface, understanding how AI-powered automation executes tasks in a Kubernetes-native environment.
+Learn to create and monitor an AgenticSession using the Ambient Code Platform web interface, understanding how AI-powered automation executes tasks in a Kubernetes-native environment.
 
 **By the end of this lab, you will:**
 
@@ -13,10 +13,10 @@ Learn to create and monitor an AgenticSession using vTeam's web interface, under
 
 ## Prerequisites 📋
 
-- [ ] vTeam installed and running ([Getting Started Guide](../../user-guide/getting-started.md))
+- [ ] Ambient Code Platform installed and running ([Getting Started Guide](../../user-guide/getting-started.md))
 - [ ] Anthropic API key configured in ProjectSettings
-- [ ] At least one project created in vTeam
-- [ ] Web browser for accessing the vTeam interface
+- [ ] At least one project created
+- [ ] Web browser for accessing the platform interface
 - [ ] Basic understanding of GitHub repositories (optional, for multi-repo exercises)
 
 ## Estimated Time ⏱️
@@ -27,12 +27,12 @@ Learn to create and monitor an AgenticSession using vTeam's web interface, under
 
 You're a developer who wants to automate code analysis and documentation tasks. You'll create your first AgenticSession to analyze a simple Python repository and generate a README file describing its functionality.
 
-## Step 1: Access the vTeam Interface
+## Step 1: Access the Platform Interface
 
-1. **Ensure vTeam is running**. For local development with OpenShift Local (CRC):
+1. **Ensure the platform is running**. For local development with OpenShift Local (CRC):
 
    ```bash
-   cd vTeam
+   cd platform
    make dev-start
    ```
 
@@ -42,14 +42,14 @@ You're a developer who wants to automate code analysis and documentation tasks. 
    echo "https://$(oc get route vteam-frontend -n vteam-dev -o jsonpath='{.spec.host}')"
    ```
 
-3. **Open your browser** to the vTeam frontend URL
+3. **Open your browser** to the frontend URL
 
 4. **Verify the interface**:
-   - You should see the vTeam dashboard
+   - You should see the dashboard
    - Navigate to your project (or create one if needed)
    - Look for the "Agentic Sessions" section
 
-**✅ Checkpoint**: Confirm you can access the vTeam interface and see the sessions list.
+**✅ Checkpoint**: Confirm you can access the interface and see the sessions list.
 
 ## Step 2: Create Your First Session (Single Repository)
 
@@ -196,7 +196,7 @@ Interactive sessions allow back-and-forth conversation with Claude Code.
 
 ## Step 6: Multi-Repository Session (Advanced)
 
-vTeam supports operating on multiple repositories simultaneously.
+The Ambient Code Platform supports operating on multiple repositories simultaneously.
 
 1. **Create a multi-repo session**:
 
@@ -314,7 +314,7 @@ A successful AgenticSession should have:
 After completing this lab, you should understand:
 
 1. **AgenticSession Lifecycle**: How sessions are created, executed, and completed
-2. **Kubernetes Integration**: How vTeam uses CRs, Operators, and Jobs
+2. **Kubernetes Integration**: How the platform uses CRs, Operators, and Jobs
 3. **Session Modes**: When to use interactive vs headless execution
 4. **Multi-Repo Support**: How to work with multiple repositories simultaneously
 5. **Monitoring**: How to track session progress via UI and CLI
@@ -337,9 +337,9 @@ You've successfully completed Lab 1 when:
 - [ ] Monitored session execution via UI and CLI
 - [ ] Understood the difference between interactive and headless modes
 - [ ] Reviewed session results and status
-- [ ] Can explain how vTeam uses Kubernetes resources
+- [ ] Can explain how the platform uses Kubernetes resources
 
-**Congratulations!** You've mastered the fundamentals of vTeam's AgenticSession workflow. You're now ready to automate development tasks using AI-powered agents in a Kubernetes-native environment.
+**Congratulations!** You've mastered the fundamentals of the Ambient Code Platform's AgenticSession workflow. You're now ready to automate development tasks using AI-powered agents in a Kubernetes-native environment.
 
 ---
 
