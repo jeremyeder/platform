@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Loader2, Settings, Sparkles, Users, Terminal } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MessageSquare, Loader2, Settings, Terminal, Users } from "lucide-react";
 import { StreamMessage } from "@/components/ui/stream-message";
 import {
   DropdownMenu,
@@ -12,8 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import type { AgenticSession, MessageObject, ToolUseMessages } from "@/types/agentic-session";
 import type { WorkflowMetadata } from "@/app/projects/[name]/sessions/[sessionName]/lib/types";
 
@@ -27,16 +26,12 @@ export type MessagesTabProps = {
   onEndSession: () => Promise<void>;
   onGoToResults?: () => void;
   onContinue: () => void;
-  selectedAgents?: string[];
-  autoSelectAgents?: boolean;
   workflowMetadata?: WorkflowMetadata;
-  onSetSelectedAgents?: (agents: string[]) => void;
-  onSetAutoSelectAgents?: (auto: boolean) => void;
   onCommandClick?: (slashCommand: string) => void;
 };
 
 
-const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chatInput, setChatInput, onSendChat, onInterrupt, onEndSession, onGoToResults, onContinue, selectedAgents = [], autoSelectAgents = false, workflowMetadata, onSetSelectedAgents, onSetAutoSelectAgents, onCommandClick }) => {
+const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chatInput, setChatInput, onSendChat, onInterrupt, onEndSession, onGoToResults, onContinue, workflowMetadata, onCommandClick }) => {
   const [sendingChat, setSendingChat] = useState(false);
   const [interrupting, setInterrupting] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -282,6 +277,18 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
           <StreamMessage key={`sm-${idx}`} message={m} isNewest={idx === filteredMessages.length - 1} onGoToResults={onGoToResults} />
         ))}
 
+        {filteredMessages.length === 0 && isCreating && (
+          <div className="flex items-center justify-center py-12">
+            <Alert className="max-w-md mx-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertTitle>Starting Session...</AlertTitle>
+              <AlertDescription>
+                <p>Setting up your workspace and initializing the agent. Messages will appear here once the session is ready.</p>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         {filteredMessages.length === 0 && !isCreating && (
           <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
             <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -299,7 +306,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
 
       {/* Settings for non-interactive sessions with messages */}
       {!isInteractive && filteredMessages.length > 0 && (
-        <div className="sticky bottom-0 border-t bg-gray-50">
+        <div className="sticky bottom-0 border-t bg-muted/50">
           <div className="p-3">
             <div className="flex items-center gap-2">
               <DropdownMenu>
@@ -313,7 +320,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                     checked={showSystemMessages}
                     onCheckedChange={setShowSystemMessages}
                   >
-                    {showSystemMessages ? 'Hide' : 'Show'} system messages
+                    Show system messages
                   </DropdownMenuCheckboxItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -324,8 +331,8 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
       )}
 
       {showChatInterface && (
-        <div className="sticky bottom-0 bg-white">
-          <div className="px-2 pt-2 pb-0 space-y-1.5">
+        <div className="sticky bottom-0 bg-card">
+          <div className="px-2 pt-2 pb-0 space-y-1.5 max-w-[90%] mx-auto mb-4">
               <div className="relative">
                 <textarea
                   ref={textareaRef}
@@ -378,7 +385,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                 {autocompleteOpen && (
                   <div 
                     ref={autocompleteRef}
-                    className="absolute z-[100] bg-white border-2 border-blue-500 rounded-md shadow-lg max-h-60 overflow-y-auto w-80"
+                    className="absolute z-[100] bg-card border-2 border-blue-500 rounded-md shadow-lg max-h-60 overflow-y-auto w-80"
                     style={{
                       bottom: '100%',
                       left: '0px',
@@ -401,8 +408,8 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                             key={agent.id}
                             className={`px-3 py-2 cursor-pointer border-b last:border-b-0 ${
                               index === autocompleteSelectedIndex
-                                ? 'bg-blue-50'
-                                : 'hover:bg-gray-50'
+                                ? 'bg-accent text-accent-foreground'
+                                : 'hover:bg-muted/50'
                             }`}
                             onClick={() => handleAutocompleteSelect(agent)}
                             onMouseEnter={() => setAutocompleteSelectedIndex(index)}
@@ -424,8 +431,8 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                             key={cmd.id}
                             className={`px-3 py-2 cursor-pointer border-b last:border-b-0 ${
                               index === autocompleteSelectedIndex
-                                ? 'bg-blue-50'
-                                : 'hover:bg-gray-50'
+                                ? 'bg-accent text-accent-foreground'
+                                : 'hover:bg-muted/50'
                             }`}
                             onClick={() => handleAutocompleteSelect(cmd)}
                             onMouseEnter={() => setAutocompleteSelectedIndex(index)}
@@ -456,11 +463,11 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                         checked={showSystemMessages}
                         onCheckedChange={setShowSystemMessages}
                       >
-                        {showSystemMessages ? 'Hide' : 'Show'} system messages
+                        Show system messages
                       </DropdownMenuCheckboxItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  
+
                   {/* Agents Button with Popover */}
                   {workflowMetadata?.agents && workflowMetadata.agents.length > 0 && (
                     <Popover open={agentsPopoverOpen} onOpenChange={setAgentsPopoverOpen}>
@@ -469,68 +476,34 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                           <Users className="h-3.5 w-3.5" />
                           Agents
                           <Badge variant="secondary" className="ml-0.5 h-4 px-1.5 text-[10px] font-medium">
-                            {autoSelectAgents ? "auto" : selectedAgents.length}
+                            {workflowMetadata.agents.length}
                           </Badge>
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent 
-                        align="start" 
-                        side="top" 
+                      <PopoverContent
+                        align="start"
+                        side="top"
                         className="w-[500px]"
                       >
                         <div className="space-y-3">
                           <div className="space-y-2">
-                            <h4 className="font-medium text-sm">Agent Selection</h4>
+                            <h4 className="font-medium text-sm">Available Agents</h4>
                             <p className="text-xs text-muted-foreground">
-                              Select agents to collaborate with or enable automatic selection
+                              Mention agents in your message to collaborate with them
                             </p>
                           </div>
 
-                          {/* Auto-select checkbox */}
-                          <div className="flex items-center space-x-2 pb-2 border-b">
-                            <Checkbox
-                              id="popover-auto-select-agents"
-                              checked={autoSelectAgents}
-                              onCheckedChange={(checked) => {
-                                if (onSetAutoSelectAgents) {
-                                  onSetAutoSelectAgents(!!checked);
-                                  if (checked && onSetSelectedAgents) {
-                                    onSetSelectedAgents([]);
-                                  }
-                                }
-                              }}
-                            />
-                            <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                            <Label htmlFor="popover-auto-select-agents" className="text-sm font-normal cursor-pointer">
-                              Automatically select agents
-                            </Label>
-                          </div>
-                          
                           {/* Agents list */}
-                          <div 
+                          <div
                             className="max-h-[400px] overflow-y-scroll space-y-2 pr-2 scrollbar-thin"
                           >
                             {workflowMetadata.agents.map((agent) => {
                               const agentNameShort = agent.name.split(' - ')[0];
-                              const isSelected = selectedAgents.includes(agent.id);
-                              
+
                               return (
                                 <div
                                   key={agent.id}
-                                  className={`p-3 rounded-md border cursor-pointer transition-colors ${
-                                    isSelected 
-                                      ? 'bg-blue-50 border-blue-300 hover:bg-blue-100' 
-                                      : 'bg-muted/30 hover:bg-muted/50'
-                                  } ${autoSelectAgents ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  onClick={() => {
-                                    if (!autoSelectAgents && onSetSelectedAgents) {
-                                      if (isSelected) {
-                                        onSetSelectedAgents(selectedAgents.filter(id => id !== agent.id));
-                                      } else {
-                                        onSetSelectedAgents([...selectedAgents, agent.id]);
-                                      }
-                                    }
-                                  }}
+                                  className="p-3 rounded-md border bg-muted/30"
                                 >
                                   <div className="flex items-center justify-between mb-1">
                                     <h3 className="text-sm font-bold">
@@ -668,7 +641,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
       )}
 
       {isInteractive && !showChatInterface && streamMessages.length > 0 && (
-        <div className="sticky bottom-0 border-t bg-gray-50">
+        <div className="sticky bottom-0 border-t bg-muted/50">
           <div className="p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -683,7 +656,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                       checked={showSystemMessages}
                       onCheckedChange={setShowSystemMessages}
                     >
-                      {showSystemMessages ? 'Hide' : 'Show'} system messages
+                      Show system messages
                     </DropdownMenuCheckboxItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -697,7 +670,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                           {" "}
                           <button
                             onClick={onContinue}
-                            className="text-blue-600 hover:underline font-medium"
+                            className="text-link hover:underline font-medium"
                           >
                             Resume this session
                           </button>

@@ -8,6 +8,22 @@ The **Ambient Code Platform** is a Kubernetes-native AI automation platform that
 
 > **Note:** This project was formerly known as "vTeam". Technical artifacts (image names, namespaces, API groups) still use "vteam" for backward compatibility.
 
+### Amber Background Agent
+
+The platform includes **Amber**, a background agent that automates common development tasks via GitHub Issues. Team members can trigger automated fixes, refactoring, and test additions without requiring direct access to Claude Code.
+
+**Quick Links**:
+
+- [Amber Quickstart](docs/amber-quickstart.md) - Get started in 5 minutes
+- [Full Documentation](docs/amber-automation.md) - Complete automation guide
+- [Amber Config](.claude/amber-config.yml) - Automation policies
+
+**Common Workflows**:
+
+- 🤖 **Auto-Fix** (label: `amber:auto-fix`): Formatting, linting, trivial fixes
+- 🔧 **Refactoring** (label: `amber:refactor`): Break large files, extract patterns
+- 🧪 **Test Coverage** (label: `amber:test-coverage`): Add missing tests
+
 ### Core Architecture
 
 The system follows a Kubernetes-native pattern with Custom Resources, Operators, and Job execution:
@@ -22,6 +38,70 @@ The system follows a Kubernetes-native pattern with Custom Resources, Operators,
 ```
 User Creates Session → Backend Creates CR → Operator Spawns Job →
 Pod Runs Claude CLI → Results Stored in CR → UI Displays Progress
+```
+
+## Memory System - Loadable Context
+
+This repository uses a structured **memory system** to provide targeted, loadable context instead of relying solely on this comprehensive CLAUDE.md file.
+
+### Quick Reference
+
+**Load these files when working in specific areas:**
+
+| Task Type | Context File | Repomix View | Pattern File |
+|-----------|--------------|--------------|--------------|
+| **Backend API work** | `.claude/context/backend-development.md` | `repomix-analysis/04-backend-focused.xml` | `.claude/patterns/k8s-client-usage.md` |
+| **Frontend UI work** | `.claude/context/frontend-development.md` | `repomix-analysis/05-frontend-focused.xml` | `.claude/patterns/react-query-usage.md` |
+| **Security review** | `.claude/context/security-standards.md` | `repomix-analysis/02-production-optimized.xml` | `.claude/patterns/error-handling.md` |
+| **Architecture questions** | - | `repomix-analysis/03-architecture-only.xml` | See ADRs below |
+
+### Available Memory Files
+
+**1. Context Files** (`.claude/context/`)
+
+- `backend-development.md` - Go backend, K8s integration, handler patterns
+- `frontend-development.md` - NextJS, Shadcn UI, React Query patterns
+- `security-standards.md` - Auth, RBAC, token handling, security patterns
+
+**2. Architectural Decision Records** (`docs/adr/`)
+
+- Documents WHY decisions were made, not just WHAT
+- `0001-kubernetes-native-architecture.md`
+- `0002-user-token-authentication.md`
+- `0003-multi-repo-support.md`
+- `0004-go-backend-python-runner.md`
+- `0005-nextjs-shadcn-react-query.md`
+
+**3. Code Pattern Catalog** (`.claude/patterns/`)
+
+- `error-handling.md` - Consistent error patterns (backend, operator, runner)
+- `k8s-client-usage.md` - When to use user token vs. service account
+- `react-query-usage.md` - Data fetching patterns (queries, mutations, caching)
+
+**4. Repomix Usage Guide** (`.claude/repomix-guide.md`)
+
+- How to use the 7 existing repomix views effectively
+- When to use each view based on the task
+
+**5. Decision Log** (`docs/decisions.md`)
+
+- Lightweight chronological record of major decisions
+- Links to ADRs, code, and context files
+
+### Example Usage
+
+```
+"Claude, load the backend-development context file and the backend-focused repomix view (04),
+then help me add a new endpoint for listing RFE workflows in a project."
+```
+
+```
+"Claude, reference the security-standards context file and review this PR for token handling issues."
+```
+
+```
+"Claude, check ADR-0002 (User Token Authentication) and explain why we use user tokens
+instead of service accounts for API operations."
 ```
 
 ## Development Commands
@@ -779,12 +859,28 @@ Study these files to understand established patterns:
 - **Registry**: Pushes to `quay.io/ambient_code` on main branch
 - **PR builds**: Build-only, no push on pull requests
 
-### Other Workflows
+### Automation Workflows
 
-- **claude.yml**: Claude Code integration
+- **amber-issue-handler.yml**: Amber background agent - automated fixes via GitHub issue labels (`amber:auto-fix`, `amber:refactor`, `amber:test-coverage`) or `/amber execute` command
+- **amber-dependency-sync.yml**: Daily sync of dependency versions to Amber agent knowledge base
+- **claude.yml**: Claude Code integration - responds to `@claude` mentions in issues/PRs
+- **claude-code-review.yml**: Automated code reviews on pull requests
+
+### Code Quality Workflows
+
+- **go-lint.yml**: Go code formatting, vetting, and linting (gofmt, go vet, golangci-lint)
+- **frontend-lint.yml**: Frontend code quality (ESLint, TypeScript checking, build validation)
+
+### Deployment & Testing Workflows
+
+- **prod-release-deploy.yaml**: Production releases with semver versioning and changelog generation
+- **e2e.yml**: End-to-end Cypress testing in kind cluster (see Testing Strategy section)
 - **test-local-dev.yml**: Local development environment validation
-- **dependabot-auto-merge.yml**: Automated dependency updates
-- **project-automation.yml**: GitHub project board automation
+
+### Utility Workflows
+
+- **docs.yml**: Deploy MkDocs documentation to GitHub Pages
+- **dependabot-auto-merge.yml**: Auto-approve and merge Dependabot dependency updates
 
 ## Testing Strategy
 
