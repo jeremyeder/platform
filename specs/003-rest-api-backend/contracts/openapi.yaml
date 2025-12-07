@@ -1,0 +1,1130 @@
+openapi: 3.1.0
+info:
+  title: ACP Mobile Backend API
+  version: 1.0.0
+  description: |
+    REST API Backend for ACP Mobile App providing session management,
+    real-time updates via SSE, GitHub notifications, and user preferences.
+
+    **CRITICAL**: All response schemas MUST match mobile app Zod schemas exactly.
+    See `/Users/jeder/repos/mobile/services/api/schemas.ts` for source of truth.
+  contact:
+    name: Ambient Code Platform Team
+    email: acp-team@redhat.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: https://ambient-code.apps.rosa.vteam-stage.7fpc.p3.openshiftapps.com/api/v1
+    description: Staging environment
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: sessions
+    description: AI coding session management
+  - name: sse
+    description: Server-Sent Events for real-time updates
+  - name: notifications
+    description: GitHub notifications integration
+  - name: repositories
+    description: Connected repository management
+  - name: user
+    description: User profile and preferences
+  - name: auth
+    description: Authentication and authorization
+
+paths:
+  # ============================================================================
+  # SESSIONS API
+  # ============================================================================
+
+  /sessions:
+    get:
+      summary: List user sessions
+      description: Retrieve all AI coding sessions for the authenticated user
+      operationId: listSessions
+      tags: [sessions]
+      parameters:
+        - name: status
+          in: query
+          description: Filter sessions by status
+          required: false
+          schema:
+            $ref: '#/components/schemas/SessionStatus'
+      responses:
+        '200':
+          description: Sessions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create new session
+      description: Create a new AI coding session
+      operationId: createSession
+      tags: [sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /sessions/{id}:
+    get:
+      summary: Get session details
+      description: Retrieve details for a specific session including logs
+      operationId: getSession
+      tags: [sessions]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      summary: Update session status
+      description: Update session status (approve, reject, pause, resume)
+      operationId: updateSession
+      tags: [sessions]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSessionRequest'
+      responses:
+        '200':
+          description: Session updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================================================
+  # SERVER-SENT EVENTS API
+  # ============================================================================
+
+  /sse/sessions:
+    get:
+      summary: Stream session updates
+      description: |
+        Server-Sent Events stream for real-time session updates.
+
+        **Event Types**:
+        - `session.progress`: Progress updates (0-100)
+        - `session.status`: Status changes (running → awaiting_review)
+        - `session.updated`: Partial session updates
+        - `notification.new`: New GitHub notifications
+        - `notification.read`: Notification marked as read
+
+        **Connection Management**:
+        - Heartbeat sent every 30 seconds (`: ping`)
+        - Client should reconnect with exponential backoff (1s → 30s max)
+        - Multiple connections per user supported
+      operationId: streamSessions
+      tags: [sse]
+      responses:
+        '200':
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE event format:
+                  ```
+                  event: session.progress
+                  data: {"sessionId":"abc-123","progress":67,"currentTask":"Running tests"}
+
+                  ```
+              examples:
+                progressUpdate:
+                  value: |
+                    event: session.progress
+                    data: {"sessionId":"abc-123","progress":67,"currentTask":"Running tests"}
+
+                statusChange:
+                  value: |
+                    event: session.status
+                    data: {"sessionId":"abc-123","status":"awaiting_review"}
+
+                sessionUpdated:
+                  value: |
+                    event: session.updated
+                    data: {"sessionId":"abc-123","changes":{"name":"Updated Name"}}
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # NOTIFICATIONS API
+  # ============================================================================
+
+  /notifications/github:
+    get:
+      summary: Get GitHub notifications
+      description: Retrieve GitHub notifications for the authenticated user
+      operationId: getNotifications
+      tags: [notifications]
+      parameters:
+        - name: unread
+          in: query
+          description: Filter for unread notifications only
+          required: false
+          schema:
+            type: string
+            enum: ['true']
+      responses:
+        '200':
+          description: Notifications retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notifications, unreadCount]
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GitHubNotification'
+                  unreadCount:
+                    type: integer
+                    minimum: 0
+                    description: Total number of unread notifications
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /notifications/read:
+    patch:
+      summary: Mark notifications as read
+      description: Mark one or more notifications as read (syncs to GitHub)
+      operationId: markNotificationsRead
+      tags: [notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [notificationIds]
+              properties:
+                notificationIds:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  description: Array of notification IDs to mark as read
+      responses:
+        '204':
+          description: Notifications marked as read successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /notifications/read-all:
+    patch:
+      summary: Mark all notifications as read
+      description: Mark all notifications as read for the user
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      responses:
+        '204':
+          description: All notifications marked as read successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /notifications/mute:
+    post:
+      summary: Mute notification thread
+      description: Mute a GitHub notification thread (suppress future notifications)
+      operationId: muteNotification
+      tags: [notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [notificationId]
+              properties:
+                notificationId:
+                  type: string
+                  description: Notification ID to mute
+      responses:
+        '204':
+          description: Notification thread muted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================================================
+  # REPOSITORIES API (Future)
+  # ============================================================================
+
+  /repositories:
+    get:
+      summary: List connected repositories
+      description: Retrieve all repositories connected to user's account
+      operationId: listRepositories
+      tags: [repositories]
+      responses:
+        '200':
+          description: Repositories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Repository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Connect repository
+      description: Connect a new GitHub repository
+      operationId: connectRepository
+      tags: [repositories]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  example: https://github.com/owner/repo
+                  description: GitHub repository URL
+      responses:
+        '201':
+          description: Repository connected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /repositories/{id}:
+    delete:
+      summary: Disconnect repository
+      description: Disconnect a repository from user's account
+      operationId: disconnectRepository
+      tags: [repositories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Repository ID
+      responses:
+        '204':
+          description: Repository disconnected successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================================================
+  # USER API
+  # ============================================================================
+
+  /user/profile:
+    get:
+      summary: Get user profile
+      description: Retrieve authenticated user's profile information
+      operationId: getUserProfile
+      tags: [user]
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /user/preferences:
+    get:
+      summary: Get user preferences
+      description: Retrieve user's app preferences
+      operationId: getUserPreferences
+      tags: [user]
+      responses:
+        '200':
+          description: User preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPreferences'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      summary: Update user preferences
+      description: Update user's app preferences
+      operationId: updateUserPreferences
+      tags: [user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '200':
+          description: User preferences updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================================================
+  # AUTHENTICATION API
+  # ============================================================================
+
+  /auth/login:
+    post:
+      summary: Initiate OAuth login
+      description: Initiate OAuth 2.0 + PKCE login flow
+      operationId: initiateLogin
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [redirectUri]
+              properties:
+                redirectUri:
+                  type: string
+                  format: uri
+                  example: acp://auth/callback
+                  description: OAuth redirect URI (mobile deep link)
+      responses:
+        '200':
+          description: OAuth URL generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authUrl, state]
+                properties:
+                  authUrl:
+                    type: string
+                    format: uri
+                    description: Backend OAuth URL to navigate to
+                  state:
+                    type: string
+                    description: OAuth state parameter for CSRF protection
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/token:
+    post:
+      summary: Exchange authorization code for tokens
+      description: Exchange OAuth authorization code for JWT access/refresh tokens
+      operationId: exchangeToken
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, codeVerifier, redirectUri]
+              properties:
+                code:
+                  type: string
+                  description: OAuth authorization code
+                codeVerifier:
+                  type: string
+                  description: PKCE code verifier
+                redirectUri:
+                  type: string
+                  format: uri
+                  description: Must match redirect URI from /auth/login
+      responses:
+        '200':
+          description: Tokens issued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Exchange refresh token for new access/refresh token pair
+      operationId: refreshToken
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  description: Current refresh token
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Refresh token invalid or expired (user must re-login)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/profile:
+    get:
+      summary: Get authenticated user
+      description: Retrieve user profile for authentication check
+      operationId: getAuthProfile
+      tags: [auth]
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# ==============================================================================
+# COMPONENTS
+# ==============================================================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token obtained from OAuth flow
+
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Session ID (UUID format)
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized - Missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ==========================================================================
+    # SESSION SCHEMAS
+    # ==========================================================================
+
+    Session:
+      type: object
+      required:
+        - id
+        - name
+        - status
+        - progress
+        - model
+        - workflowType
+        - repository
+        - createdAt
+        - updatedAt
+        - tasksCompleted
+      properties:
+        id:
+          type: string
+          description: Unique session identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          description: Session name (Kubernetes DNS-1123 label)
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          maxLength: 63
+          example: code-review-pr-42
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Completion percentage
+          example: 45
+        model:
+          $ref: '#/components/schemas/ModelType'
+        workflowType:
+          type: string
+          description: Workflow type
+          example: review
+          enum:
+            - review
+            - bugfix
+            - plan
+            - research
+            - chat
+        repository:
+          $ref: '#/components/schemas/Repository'
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp (ISO 8601)
+          example: '2025-12-07T10:00:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp (ISO 8601)
+          example: '2025-12-07T10:30:00.000Z'
+        currentTask:
+          type: string
+          nullable: true
+          description: Current task description
+          maxLength: 500
+          example: Analyzing code structure
+        tasksCompleted:
+          type: array
+          items:
+            type: string
+          description: List of completed task descriptions
+          example:
+            - Clone repository
+            - Install dependencies
+        errorMessage:
+          type: string
+          nullable: true
+          description: Error message (only if status is 'error')
+          maxLength: 1000
+          example: null
+
+    SessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Session'
+        - type: object
+          properties:
+            logs:
+              type: array
+              items:
+                $ref: '#/components/schemas/LogEntry'
+              description: Session execution logs
+
+    LogEntry:
+      type: object
+      required:
+        - timestamp
+        - level
+        - message
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Log entry timestamp (ISO 8601)
+        level:
+          type: string
+          enum:
+            - info
+            - warning
+            - error
+          description: Log level
+        message:
+          type: string
+          description: Log message
+
+    SessionStatus:
+      type: string
+      enum:
+        - running
+        - paused
+        - done
+        - awaiting_review
+        - error
+      description: Session execution status
+
+    ModelType:
+      type: string
+      enum:
+        - sonnet-4.5
+        - opus-4.5
+      description: AI model type
+
+    CreateSessionRequest:
+      type: object
+      required:
+        - workflowType
+        - model
+        - repositoryUrl
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          maxLength: 63
+          description: Optional session name (auto-generated if not provided)
+        workflowType:
+          type: string
+          enum:
+            - review
+            - bugfix
+            - plan
+            - research
+            - chat
+          description: Workflow type
+        model:
+          $ref: '#/components/schemas/ModelType'
+        repositoryUrl:
+          type: string
+          format: uri
+          description: |
+            ⚠️ CRITICAL: Mobile app sends repositoryId here.
+            Backend must clarify if it expects ID or URL.
+          example: https://github.com/owner/repo
+        branch:
+          type: string
+          description: Git branch name (defaults to 'main')
+          example: main
+
+    UpdateSessionRequest:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          enum:
+            - approve
+            - reject
+            - pause
+            - resume
+          description: Action to perform on session
+        feedback:
+          type: string
+          description: Optional feedback for approve/reject actions
+          maxLength: 5000
+
+    # ==========================================================================
+    # REPOSITORY SCHEMA
+    # ==========================================================================
+
+    Repository:
+      type: object
+      required:
+        - id
+        - name
+        - url
+        - branch
+        - isConnected
+      properties:
+        id:
+          type: string
+          description: Repository identifier (derived from URL)
+          example: repo-abc123def456
+        name:
+          type: string
+          description: Repository name (format: owner/repo)
+          pattern: '^[^/]+/[^/]+$'
+          example: ambient-code/platform
+        url:
+          type: string
+          format: uri
+          description: GitHub repository URL
+          example: https://github.com/ambient-code/platform
+        branch:
+          type: string
+          description: Git branch
+          example: main
+        isConnected:
+          type: boolean
+          description: Connection status
+          example: true
+
+    # ==========================================================================
+    # NOTIFICATION SCHEMAS
+    # ==========================================================================
+
+    GitHubNotification:
+      type: object
+      required:
+        - id
+        - type
+        - repository
+        - itemNumber
+        - title
+        - author
+        - timestamp
+        - isUnread
+        - suggestedWorkflow
+        - url
+      properties:
+        id:
+          type: string
+          description: GitHub notification thread ID
+          example: '12345678'
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        repository:
+          type: string
+          description: Repository name (format: owner/repo)
+          pattern: '^[^/]+/[^/]+$'
+          example: ambient-code/mobile
+        itemNumber:
+          type: integer
+          minimum: 1
+          description: Pull request or issue number
+          example: 42
+        title:
+          type: string
+          description: Notification title
+          maxLength: 500
+          example: Add SSE support for real-time updates
+        author:
+          type: string
+          description: Author username
+          example: contributor
+        timestamp:
+          type: string
+          format: date-time
+          description: Last updated timestamp (ISO 8601)
+          example: '2025-12-07T10:00:00.000Z'
+        isUnread:
+          type: boolean
+          description: Read status
+          example: true
+        suggestedWorkflow:
+          type: string
+          description: Suggested workflow type based on notification
+          example: review
+          enum:
+            - review
+            - bugfix
+            - plan
+            - chat
+        url:
+          type: string
+          format: uri
+          description: GitHub URL for notification
+          example: https://github.com/ambient-code/mobile/pull/42
+
+    NotificationType:
+      type: string
+      enum:
+        - pull_request
+        - pull_request_review
+        - issue
+        - issue_comment
+        - commit_comment
+        - mention
+        - release
+        - security_alert
+      description: GitHub notification type
+
+    # ==========================================================================
+    # USER SCHEMAS
+    # ==========================================================================
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - role
+        - ssoProvider
+      properties:
+        id:
+          type: string
+          description: Unique user identifier from OAuth
+          example: user-123
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: developer@redhat.com
+        name:
+          type: string
+          description: Display name
+          example: Developer User
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Profile picture URL
+          example: https://avatars.githubusercontent.com/u/123456
+        role:
+          type: string
+          description: User role (e.g., developer, admin)
+          example: developer
+        ssoProvider:
+          type: string
+          description: OAuth provider
+          example: redhat-sso
+
+    UserPreferences:
+      type: object
+      required:
+        - theme
+        - notifications
+      properties:
+        theme:
+          type: string
+          enum:
+            - light
+            - dark
+            - system
+          description: UI theme preference
+          example: dark
+        notifications:
+          $ref: '#/components/schemas/NotificationSettings'
+        quietHours:
+          $ref: '#/components/schemas/QuietHours'
+          nullable: true
+
+    NotificationSettings:
+      type: object
+      required:
+        - blockingAlerts
+        - reviewRequests
+        - sessionUpdates
+        - featuresAndNews
+      properties:
+        blockingAlerts:
+          type: boolean
+          description: Enable blocking alerts
+          example: true
+        reviewRequests:
+          type: boolean
+          description: Enable review request notifications
+          example: true
+        sessionUpdates:
+          type: boolean
+          description: Enable session update notifications
+          example: true
+        featuresAndNews:
+          type: boolean
+          description: Enable features and news notifications
+          example: false
+
+    QuietHours:
+      type: object
+      required:
+        - enabled
+        - start
+        - end
+      properties:
+        enabled:
+          type: boolean
+          description: Enable quiet hours
+          example: true
+        start:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Start time (24-hour format HH:MM)
+          example: '22:00'
+        end:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: End time (24-hour format HH:MM)
+          example: '08:00'
+
+    # ==========================================================================
+    # AUTHENTICATION SCHEMAS
+    # ==========================================================================
+
+    TokenResponse:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+        - expiresIn
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          description: JWT refresh token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Access token expiration in seconds
+          example: 3600
+
+    # ==========================================================================
+    # ERROR SCHEMA
+    # ==========================================================================
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid session ID format
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          description: Optional additional error context
+          example: { "field": "id", "reason": "must be UUID format" }
