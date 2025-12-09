@@ -84,9 +84,9 @@ build-operator: ## Build operator image
 	@cd components/operator && $(CONTAINER_ENGINE) build $(PLATFORM_FLAG) $(BUILD_FLAGS) -t $(OPERATOR_IMAGE) .
 	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Operator built: $(OPERATOR_IMAGE)"
 
-build-runner: ## Build Claude Code runner image
-	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Building runner with $(CONTAINER_ENGINE)..."
-	@cd components/runners && $(CONTAINER_ENGINE) build $(PLATFORM_FLAG) $(BUILD_FLAGS) -t $(RUNNER_IMAGE) -f claude-code-runner/Dockerfile .
+build-runner: ## Build Claude Code runner image (with BuildKit for optimized caching)
+	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Building runner with $(CONTAINER_ENGINE) (BuildKit enabled)..."
+	@cd components/runners && DOCKER_BUILDKIT=1 $(CONTAINER_ENGINE) build $(PLATFORM_FLAG) $(BUILD_FLAGS) --progress=plain -t $(RUNNER_IMAGE) -f claude-code-runner/Dockerfile .
 	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Runner built: $(RUNNER_IMAGE)"
 
 ##@ Git Hooks
@@ -334,12 +334,28 @@ local-test-quick: check-kubectl check-minikube ## Quick smoke test of local envi
 	@minikube status >/dev/null 2>&1 && echo "$(COLOR_GREEN)✓$(COLOR_RESET) Minikube running" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Minikube not running" && exit 1)
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Testing namespace..."
 	@kubectl get namespace $(NAMESPACE) >/dev/null 2>&1 && echo "$(COLOR_GREEN)✓$(COLOR_RESET) Namespace exists" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Namespace missing" && exit 1)
-	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Testing pods..."
-	@kubectl get pods -n $(NAMESPACE) 2>/dev/null | grep -q "Running" && echo "$(COLOR_GREEN)✓$(COLOR_RESET) Pods running" || (echo "$(COLOR_RED)✗$(COLOR_RESET) No pods running" && exit 1)
+	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Waiting for pods to be ready..."
+	@kubectl wait --for=condition=ready pod -l app=backend -n $(NAMESPACE) --timeout=60s >/dev/null 2>&1 && \
+	 kubectl wait --for=condition=ready pod -l app=frontend -n $(NAMESPACE) --timeout=60s >/dev/null 2>&1 && \
+	 echo "$(COLOR_GREEN)✓$(COLOR_RESET) Pods ready" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Pods not ready" && exit 1)
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Testing backend health..."
-	@curl -sf http://$$(minikube ip):30080/health >/dev/null 2>&1 && echo "$(COLOR_GREEN)✓$(COLOR_RESET) Backend healthy" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Backend not responding" && exit 1)
+	@for i in 1 2 3 4 5; do \
+		curl -sf http://$$(minikube ip):30080/health >/dev/null 2>&1 && { echo "$(COLOR_GREEN)✓$(COLOR_RESET) Backend healthy"; break; } || { \
+			if [ $$i -eq 5 ]; then \
+				echo "$(COLOR_RED)✗$(COLOR_RESET) Backend not responding after 5 attempts"; exit 1; \
+			fi; \
+			sleep 2; \
+		}; \
+	done
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Testing frontend..."
-	@curl -sf http://$$(minikube ip):30030 >/dev/null 2>&1 && echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend accessible" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Frontend not responding" && exit 1)
+	@for i in 1 2 3 4 5; do \
+		curl -sf http://$$(minikube ip):30030 >/dev/null 2>&1 && { echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend accessible"; break; } || { \
+			if [ $$i -eq 5 ]; then \
+				echo "$(COLOR_RED)✗$(COLOR_RESET) Frontend not responding after 5 attempts"; exit 1; \
+			fi; \
+			sleep 2; \
+		}; \
+	done
 	@echo ""
 	@echo "$(COLOR_GREEN)✓ Quick smoke test passed!$(COLOR_RESET)"
 
