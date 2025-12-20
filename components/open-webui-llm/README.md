@@ -26,9 +26,11 @@ A phased deployment of Open WebUI with LiteLLM proxy for chatting with Claude mo
    ```bash
    cd overlays/phase1-kind
 
-   # Edit secrets.yaml and replace sk-ant-YOUR-KEY-HERE with your actual key
-   # Or use sed:
-   sed -i.bak 's/sk-ant-YOUR-KEY-HERE/sk-ant-api01-YOUR-ACTUAL-KEY/g' secrets.yaml
+   # Create .env from template
+   cp .env.example .env
+
+   # Edit .env and add your actual Anthropic API key
+   # ANTHROPIC_API_KEY=sk-ant-api01-YOUR-ACTUAL-KEY
    ```
 
 2. **Deploy to Kind**:
@@ -43,8 +45,8 @@ A phased deployment of Open WebUI with LiteLLM proxy for chatting with Claude mo
    ```
 
 4. **Access Open WebUI**:
-   - **Docker**: http://vteam.local/chat
-   - **Podman**: http://vteam.local:8080/chat
+   - **Docker**: http://ambient.local/chat
+   - **Podman**: http://ambient.local:8080/chat
 
 ### Usage
 
@@ -103,17 +105,17 @@ kubectl describe pod -n openwebui -l app=openwebui
 
 **Docker** (ports 80/443):
 ```bash
-# Verify vteam.local resolves to 127.0.0.1
-grep vteam.local /etc/hosts
+# Verify ambient.local resolves to 127.0.0.1
+grep ambient.local /etc/hosts
 
 # Test ingress
-curl http://vteam.local/chat
+curl http://ambient.local/chat
 ```
 
 **Podman** (ports 8080/8443):
 ```bash
 # Use port 8080
-curl http://vteam.local:8080/chat
+curl http://ambient.local:8080/chat
 ```
 
 **Fallback - Port forwarding**:
@@ -173,7 +175,7 @@ kubectl get sc
 ## Data Flow
 
 ```
-User Browser → vteam.local/chat → Nginx Ingress → Open WebUI Service
+User Browser → ambient.local/chat → Nginx Ingress → Open WebUI Service
   → Open WebUI Pod → LiteLLM Service → LiteLLM Pod → Anthropic API
 ```
 
@@ -206,7 +208,7 @@ kubectl delete namespace openwebui
 ## Next Steps
 
 1. Try chatting with different Claude models
-2. Explore Open WebUI settings (http://vteam.local/chat/settings)
+2. Explore Open WebUI settings (http://ambient.local/chat/settings)
 3. Review LiteLLM logs to see API calls: `make phase1-logs-litellm`
 4. Plan for Phase 2 migration (see `docs/PHASE2.md`)
 

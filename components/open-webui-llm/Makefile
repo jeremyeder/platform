@@ -20,8 +20,8 @@ help:
 	@echo "  2. API key configured (edit: overlays/phase1-kind/secrets.yaml)"
 	@echo ""
 	@echo "Access:"
-	@echo "  Docker: http://vteam.local/chat"
-	@echo "  Podman: http://vteam.local:8080/chat"
+	@echo "  Docker: http://ambient.local/chat"
+	@echo "  Podman: http://ambient.local:8080/chat"
 
 phase1-deploy:
 	@echo "Deploying Phase 1 (Kind)..."
@@ -39,8 +39,8 @@ phase1-deploy:
 	@echo "✅ Phase 1 deployed!"
 	@echo ""
 	@echo "Access Open WebUI:"
-	@echo "  Docker: http://vteam.local/chat"
-	@echo "  Podman: http://vteam.local:8080/chat"
+	@echo "  Docker: http://ambient.local/chat"
+	@echo "  Podman: http://ambient.local:8080/chat"
 
 phase1-clean:
 	@echo "Removing Phase 1 deployment..."

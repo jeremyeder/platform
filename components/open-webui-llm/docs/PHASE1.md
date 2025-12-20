@@ -44,21 +44,23 @@ This guide covers Phase 1 deployment of Open WebUI + LiteLLM on Kind cluster wit
 
 ### 1. Configure API Key
 
-Edit the secrets file:
+Create a `.env` file from the template:
 
 ```bash
 cd components/open-webui-llm/overlays/phase1-kind
-vi secrets.yaml
+cp .env.example .env
 ```
 
-Replace `sk-ant-YOUR-KEY-HERE` with your actual Anthropic API key:
+Edit `.env` and replace the placeholder with your actual Anthropic API key:
 
-```yaml
-stringData:
-  ANTHROPIC_API_KEY: "sk-ant-api01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```bash
+ANTHROPIC_API_KEY=sk-ant-api01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LITELLM_MASTER_KEY=sk-litellm-dev-master-key
+WEBUI_AUTH=false
+OPENAI_API_BASE_URL=http://litellm-service:4000/v1
 ```
 
-**Security Note**: This file is excluded from git via `.gitignore`. Never commit actual API keys.
+**Security Note**: The `.env` file is excluded from git via `.gitignore`. Never commit actual API keys.
 
 ### 2. Deploy
 
@@ -104,12 +106,12 @@ All pods should show `Running` and `1/1 Ready`.
 
 **Docker users**:
 ```
-http://vteam.local/chat
+http://ambient.local/chat
 ```
 
 **Podman users**:
 ```
-http://vteam.local:8080/chat
+http://ambient.local:8080/chat
 ```
 
 **First visit**:
@@ -227,13 +229,15 @@ kubectl get secret litellm-secrets -n openwebui
 kubectl get secret litellm-secrets -n openwebui -o jsonpath='{.data.ANTHROPIC_API_KEY}' | base64 -d
 # Should show: sk-ant-api01-...
 
-# If wrong, update secrets.yaml and redeploy
+# If wrong, update .env file and redeploy
+cd overlays/phase1-kind
+# Edit .env with correct API key
 make phase1-deploy
 ```
 
 ### Issue: Ingress returns 404
 
-**Symptom**: `curl http://vteam.local/chat` returns 404
+**Symptom**: `curl http://ambient.local/chat` returns 404
 
 **Solution**:
 ```bash
@@ -243,12 +247,12 @@ kubectl get ingress -n openwebui
 # Check ingress-nginx logs
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
 
-# Verify vteam.local in /etc/hosts
-grep vteam.local /etc/hosts
-# Should show: 127.0.0.1 vteam.local
+# Verify ambient.local in /etc/hosts
+grep ambient.local /etc/hosts
+# Should show: 127.0.0.1 ambient.local
 
 # If using Podman, try port 8080
-curl http://vteam.local:8080/chat
+curl http://ambient.local:8080/chat
 ```
 
 ### Issue: Open WebUI loads but can't connect to LiteLLM

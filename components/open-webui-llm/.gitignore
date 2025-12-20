@@ -3,6 +3,9 @@
 *.env
 !.env.example
 
+# Secrets manifests (use secretGenerator with .env instead)
+overlays/*/secrets.yaml
+
 # Backup files
 *.bak
 backup*.tar.gz
