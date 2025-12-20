@@ -104,12 +104,12 @@ All pods should show `Running` and `1/1 Ready`.
 
 **Docker users**:
 ```
-http://vteam.local/chat
+http://ambient.local/chat
 ```
 
 **Podman users**:
 ```
-http://vteam.local:8080/chat
+http://ambient.local:8080/chat
 ```
 
 **First visit**:
@@ -233,7 +233,7 @@ make phase1-deploy
 
 ### Issue: Ingress returns 404
 
-**Symptom**: `curl http://vteam.local/chat` returns 404
+**Symptom**: `curl http://ambient.local/chat` returns 404
 
 **Solution**:
 ```bash
@@ -243,12 +243,12 @@ kubectl get ingress -n openwebui
 # Check ingress-nginx logs
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
 
-# Verify vteam.local in /etc/hosts
-grep vteam.local /etc/hosts
-# Should show: 127.0.0.1 vteam.local
+# Verify ambient.local in /etc/hosts
+grep ambient.local /etc/hosts
+# Should show: 127.0.0.1 ambient.local
 
 # If using Podman, try port 8080
-curl http://vteam.local:8080/chat
+curl http://ambient.local:8080/chat
 ```
 
 ### Issue: Open WebUI loads but can't connect to LiteLLM
