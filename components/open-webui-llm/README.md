@@ -4,10 +4,11 @@ A phased deployment of Open WebUI with LiteLLM proxy for chatting with Claude mo
 
 ## Architecture
 
-- **Phase 1**: Open WebUI → LiteLLM → Anthropic Claude API (simple proxy, no auth)
-- **Phase 2** (Future): Long-running Claude service for Amber agent integration
+Open WebUI → LiteLLM → Anthropic Claude API (simple proxy, no auth)
 
-## Quick Start (Phase 1)
+This is a standalone development tool. For production use cases with OAuth, multi-agent collaboration, and GitHub/GitLab integration, see the main [Ambient Code Platform](../../README.md).
+
+## Quick Start
 
 ### Prerequisites
 
@@ -155,18 +156,14 @@ kubectl get sc
 │   └── kustomization.yaml
 │
 ├── overlays/
-│   ├── phase1-kind/          # Phase 1: Simple deployment
-│   │   ├── kustomization.yaml
-│   │   ├── secrets.yaml      # API keys (edit this!)
-│   │   ├── ingress.yaml      # Nginx ingress
-│   │   └── pvc-patch.yaml    # Reduced storage for Kind
-│   │
-│   └── phase2-production/    # Phase 2: Future (OAuth, Claude service)
-│       └── (planned)
+│   └── phase1-kind/          # Kind deployment
+│       ├── kustomization.yaml
+│       ├── .env.example      # API key template
+│       ├── ingress.yaml      # Nginx ingress
+│       └── pvc-patch.yaml    # Reduced storage for Kind
 │
 ├── docs/
-│   ├── PHASE1.md             # Detailed Phase 1 guide
-│   └── PHASE2.md             # Phase 2 migration plan
+│   └── PHASE1.md             # Detailed deployment guide
 │
 ├── Makefile                  # Deployment automation
 └── README.md                 # This file
@@ -179,21 +176,21 @@ User Browser → ambient.local/chat → Nginx Ingress → Open WebUI Service
   → Open WebUI Pod → LiteLLM Service → LiteLLM Pod → Anthropic API
 ```
 
-## Phase 2 (Future)
+## Production Use
 
-Phase 2 will add:
-- **Authentication**: OAuth2 proxy for production use
-- **Claude Service**: Long-running Claude Code sessions
-- **Amber Integration**: Direct integration with Amber agent
-- **Production deployment**: OpenShift Routes, proper RBAC
+For production deployments with:
+- **Authentication**: OAuth2 integration
+- **Long-running sessions**: Multi-agent collaboration
+- **Git integration**: GitHub and GitLab support
+- **Enterprise features**: RBAC, monitoring, HA
 
-See `docs/PHASE2.md` for migration plan (coming soon).
+See the main [Ambient Code Platform](../../README.md) which provides these capabilities.
 
-## Files You May Need to Edit
+## Configuration Files
 
-- **`overlays/phase1-kind/secrets.yaml`**: Add your Anthropic API key here (required)
-- **`base/litellm/configmap.yaml`**: Add more models or adjust LiteLLM settings
-- **`base/open-webui/deployment.yaml`**: Change resource limits or add environment variables
+- **`overlays/phase1-kind/.env`**: Your Anthropic API key (gitignored, copy from `.env.example`)
+- **`base/litellm/configmap.yaml`**: LiteLLM model configuration
+- **`base/open-webui/deployment.yaml`**: Resource limits and environment variables
 
 ## Clean Up
 
@@ -208,9 +205,9 @@ kubectl delete namespace openwebui
 ## Next Steps
 
 1. Try chatting with different Claude models
-2. Explore Open WebUI settings (http://ambient.local/chat/settings)
+2. Explore Open WebUI settings via the web interface
 3. Review LiteLLM logs to see API calls: `make phase1-logs-litellm`
-4. Plan for Phase 2 migration (see `docs/PHASE2.md`)
+4. For production use, explore the main [Ambient Code Platform](../../README.md)
 
 ## Support
 

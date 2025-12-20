@@ -10,12 +10,15 @@ This guide covers Phase 1 deployment of Open WebUI + LiteLLM on Kind cluster wit
 - ✅ Persistent storage for chat history
 - ✅ Nginx ingress routing
 
-## What's Not Included (Phase 2)
+## What's Not Included
 
-- ❌ OAuth authentication
-- ❌ Long-running Claude Code sessions
-- ❌ Amber agent integration
-- ❌ Production hardening
+This is a simple development tool for quick Claude API access. For production use cases requiring:
+- OAuth authentication
+- Long-running sessions with multi-agent collaboration
+- GitHub/GitLab integration
+- Production hardening and monitoring
+
+See the main [Ambient Code Platform](../../../README.md) instead.
 
 ## Prerequisites
 
@@ -349,15 +352,15 @@ make phase1-deploy
 1. **Test different models**: Try claude-haiku-3-5 for speed
 2. **Explore Open WebUI**: Settings → Models, System Prompts, etc.
 3. **Monitor resources**: `kubectl top pods -n openwebui`
-4. **Plan Phase 2**: See `PHASE2.md` for OAuth and Claude service
+4. **For production**: Consider the main [Ambient Code Platform](../../../README.md) for enterprise features
 
-## Security Notes for Phase 1
+## Security Notes
 
-**⚠️ Phase 1 is for development/testing only:**
+**⚠️ This deployment is for development/testing only:**
 
 - No authentication (anyone with network access can use UI)
 - API keys in Kubernetes Secrets (base64, not encrypted at rest)
 - No network policies (pods can access any external service)
 - No resource quotas (can consume unlimited cluster resources)
 
-**Do NOT use Phase 1 in production**. Migrate to Phase 2 for production deployment.
+**Do NOT use in production**. For production deployments, use the main [Ambient Code Platform](../../../README.md).
