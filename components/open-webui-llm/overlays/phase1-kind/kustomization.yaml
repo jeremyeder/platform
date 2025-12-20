@@ -6,8 +6,27 @@ namespace: openwebui
 # Resources (base + phase1-specific)
 resources:
 - ../../base
-- secrets.yaml
 - ingress.yaml
+
+# Generate secrets from .env file
+secretGenerator:
+- name: litellm-secrets
+  namespace: openwebui
+  envs:
+  - .env
+  behavior: create
+  options:
+    labels:
+      app: litellm
+
+- name: openwebui-secrets
+  namespace: openwebui
+  envs:
+  - .env
+  behavior: create
+  options:
+    labels:
+      app: openwebui
 
 # Patches for Phase 1 environment
 patches:

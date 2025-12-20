@@ -44,21 +44,23 @@ This guide covers Phase 1 deployment of Open WebUI + LiteLLM on Kind cluster wit
 
 ### 1. Configure API Key
 
-Edit the secrets file:
+Create a `.env` file from the template:
 
 ```bash
 cd components/open-webui-llm/overlays/phase1-kind
-vi secrets.yaml
+cp .env.example .env
 ```
 
-Replace `sk-ant-YOUR-KEY-HERE` with your actual Anthropic API key:
+Edit `.env` and replace the placeholder with your actual Anthropic API key:
 
-```yaml
-stringData:
-  ANTHROPIC_API_KEY: "sk-ant-api01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```bash
+ANTHROPIC_API_KEY=sk-ant-api01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LITELLM_MASTER_KEY=sk-litellm-dev-master-key
+WEBUI_AUTH=false
+OPENAI_API_BASE_URL=http://litellm-service:4000/v1
 ```
 
-**Security Note**: This file is excluded from git via `.gitignore`. Never commit actual API keys.
+**Security Note**: The `.env` file is excluded from git via `.gitignore`. Never commit actual API keys.
 
 ### 2. Deploy
 
@@ -227,7 +229,9 @@ kubectl get secret litellm-secrets -n openwebui
 kubectl get secret litellm-secrets -n openwebui -o jsonpath='{.data.ANTHROPIC_API_KEY}' | base64 -d
 # Should show: sk-ant-api01-...
 
-# If wrong, update secrets.yaml and redeploy
+# If wrong, update .env file and redeploy
+cd overlays/phase1-kind
+# Edit .env with correct API key
 make phase1-deploy
 ```
 

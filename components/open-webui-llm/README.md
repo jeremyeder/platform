@@ -26,9 +26,11 @@ A phased deployment of Open WebUI with LiteLLM proxy for chatting with Claude mo
    ```bash
    cd overlays/phase1-kind
 
-   # Edit secrets.yaml and replace sk-ant-YOUR-KEY-HERE with your actual key
-   # Or use sed:
-   sed -i.bak 's/sk-ant-YOUR-KEY-HERE/sk-ant-api01-YOUR-ACTUAL-KEY/g' secrets.yaml
+   # Create .env from template
+   cp .env.example .env
+
+   # Edit .env and add your actual Anthropic API key
+   # ANTHROPIC_API_KEY=sk-ant-api01-YOUR-ACTUAL-KEY
    ```
 
 2. **Deploy to Kind**:
