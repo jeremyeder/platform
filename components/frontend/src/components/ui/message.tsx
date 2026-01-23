@@ -6,6 +6,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { formatTimestamp } from "@/lib/format-timestamp";
+import { Check, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export type MessageRole = "bot" | "user";
 
@@ -25,6 +27,45 @@ export type MessageProps = {
   feedbackButtons?: React.ReactNode;
 };
 
+// Code block component with copy button
+const CodeBlock = ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+  const [copied, setCopied] = React.useState(false);
+  const codeContent = String(children || '');
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(codeContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group my-2">
+      <pre className="bg-muted text-foreground py-3 px-4 rounded-lg text-xs overflow-x-auto border">
+        <code className={className}>{children}</code>
+      </pre>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleCopy}
+        className="absolute top-2 right-2 h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background"
+        title={copied ? "Copied!" : "Copy code"}
+      >
+        {copied ? (
+          <>
+            <Check className="h-3 w-3 mr-1" />
+            <span className="text-xs">Copied</span>
+          </>
+        ) : (
+          <>
+            <Copy className="h-3 w-3 mr-1" />
+            <span className="text-xs">Copy</span>
+          </>
+        )}
+      </Button>
+    </div>
+  );
+};
+
 const defaultComponents: Components = {
   code: ({
     inline,
@@ -39,7 +80,7 @@ const defaultComponents: Components = {
     // Convert children to string to check length
     const codeContent = String(children || '');
     const isShortCode = codeContent.length <= 50 && !codeContent.includes('\n');
-    
+
     // Treat short code blocks as inline
     if (inline || isShortCode) {
       return (
@@ -51,18 +92,9 @@ const defaultComponents: Components = {
         </code>
       );
     }
-    
-    // Full code blocks for longer content
-    return (
-      <pre className="bg-muted text-foreground py-3 rounded text-xs overflow-x-auto border my-2">
-        <code
-          className={className}
-          {...(props as React.HTMLAttributes<HTMLElement>)}
-        >
-          {children}
-        </code>
-      </pre>
-    );
+
+    // Full code blocks with copy button
+    return <CodeBlock className={className}>{children}</CodeBlock>;
   },
   p: ({ children }) => (
     <p className="text-muted-foreground leading-relaxed mb-[0.2rem] text-sm">{children}</p>
@@ -113,7 +145,7 @@ export const LoadingDots = () => {
   }, []);
 
   return (
-    <div className="flex items-center mt-2">
+    <div className="flex items-center mt-2 animate-in fade-in duration-300">
       <svg
         width="24"
         height="8"
@@ -126,13 +158,16 @@ export const LoadingDots = () => {
             @keyframes loadingDotPulse {
               0%, 60%, 100% {
                 opacity: 0.3;
+                transform: scale(0.8);
               }
               30% {
                 opacity: 1;
+                transform: scale(1.1);
               }
             }
             .loading-dot {
               animation: loadingDotPulse 1.4s infinite ease-in-out;
+              transform-origin: center;
             }
             .loading-dot-1 {
               animation-delay: 0s;
@@ -167,7 +202,9 @@ export const LoadingDots = () => {
           fill="currentColor"
         />
       </svg>
-      <span className="ml-2 text-xs text-muted-foreground/60">{LOADING_MESSAGES[messageIndex]}</span>
+      <span className="ml-2 text-xs text-muted-foreground/70 animate-in fade-in duration-500">
+        {LOADING_MESSAGES[messageIndex]}
+      </span>
     </div>
   );
 };
@@ -200,7 +237,15 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>(
     )
 
     return (
-      <div ref={ref} className={cn("mb-4", isBot && "mt-2", className)} {...props}>
+      <div
+        ref={ref}
+        className={cn(
+          "mb-4 animate-in fade-in slide-in-from-bottom-2 duration-300",
+          isBot && "mt-2",
+          className
+        )}
+        {...props}
+      >
         <div className={cn("flex space-x-3", isBot ? "items-start" : "items-center justify-end")}>
           {/* Avatar */}
          {isBot ? avatar : null}
@@ -214,11 +259,14 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>(
               </div>
             )}
             <div className={cn(
-              borderless ? "p-0" : "rounded-lg",
-              !borderless && (isBot ? "bg-card" : "bg-border/30")
+              borderless ? "p-0" : "rounded-2xl shadow-sm",
+              !borderless && (isBot
+                ? "bg-card border border-border/50 hover:shadow-md transition-shadow"
+                : "bg-primary/10 border border-primary/20"
+              )
             )}>
               {/* Content */}
-              <div className={cn("text-sm text-foreground", !isBot && "py-2 px-4")}>
+              <div className={cn("text-sm text-foreground", !isBot && "py-2.5 px-4")}>
                 {isLoading ? (
                   <div>
                     <div className="text-sm text-muted-foreground mb-2">{content}</div>

@@ -54,7 +54,13 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
   const [autocompleteFilter, setAutocompleteFilter] = useState('');
   const [autocompleteTriggerPos, setAutocompleteTriggerPos] = useState(0);
   const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0);
-  
+
+  // Message history navigation state
+  const [messageHistory, setMessageHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [isEditingHistory, setIsEditingHistory] = useState(false);
+  const [originalInput, setOriginalInput] = useState('');
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
@@ -74,15 +80,39 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
   // Filter out system messages unless showSystemMessages is true
   const filteredMessages = streamMessages.filter((msg) => {
     if (showSystemMessages) return true;
-    
+
     // Hide system_message type by default
     // Check if msg has a type property and if it's a system_message
     if ('type' in msg && msg.type === "system_message") {
       return false;
     }
-    
+
     return true;
   });
+
+  // Build message history from user messages
+  useEffect(() => {
+    const userMessages = streamMessages
+      .filter((msg) => 'role' in msg && msg.role === 'user' && 'content' in msg)
+      .map((msg) => {
+        if ('content' in msg) {
+          // Handle both string content and array content
+          if (typeof msg.content === 'string') {
+            return msg.content;
+          } else if (Array.isArray(msg.content)) {
+            // Extract text from content array
+            return msg.content
+              .filter((c) => c.type === 'text')
+              .map((c) => c.text)
+              .join('\n');
+          }
+        }
+        return '';
+      })
+      .filter((content) => content.trim().length > 0);
+
+    setMessageHistory(userMessages);
+  }, [streamMessages]);
 
   // Check if user is scrolled to the bottom
   const checkIfAtBottom = () => {
@@ -243,14 +273,20 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
   const handleChatInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart;
-    
+
     setChatInput(newValue);
-    
+
+    // If user manually edits while in history navigation mode, exit history mode
+    if (isEditingHistory) {
+      setIsEditingHistory(false);
+      setHistoryIndex(-1);
+    }
+
     // Check if we should show autocomplete
     if (cursorPos > 0) {
       const charBeforeCursor = newValue[cursorPos - 1];
       const textBeforeCursor = newValue.substring(0, cursorPos);
-      
+
       // Check for @ or / trigger
       if (charBeforeCursor === '@' || charBeforeCursor === '/') {
         // Make sure it's at the start or after whitespace
@@ -263,11 +299,11 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
           return;
         }
       }
-      
+
       // Update filter if autocomplete is open
       if (autocompleteOpen) {
         const filterText = textBeforeCursor.substring(autocompleteTriggerPos + 1);
-        
+
         // Close if we've moved past the trigger or hit whitespace
         if (cursorPos <= autocompleteTriggerPos || /\s/.test(filterText)) {
           setAutocompleteOpen(false);
@@ -406,8 +442,14 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
               <div className="relative">
                 <textarea
                   ref={textareaRef}
-                  className="w-full border rounded p-2 text-sm"
-                  placeholder={isRunActive ? "Agent is processing... (click Stop to interrupt)" : "Type a message to the agent... (Press Enter to send, Shift+Enter for new line)"}
+                  className={`w-full border rounded p-2 text-sm ${isEditingHistory ? 'border-blue-500 ring-1 ring-blue-500' : ''}`}
+                  placeholder={
+                    isEditingHistory
+                      ? "Editing previous message (Esc to cancel, Enter to send)"
+                      : isRunActive
+                      ? "Agent is processing... (click Stop to interrupt)"
+                      : "Type a message to the agent... (Press Enter to send, Shift+Enter for new line)"
+                  }
                   value={chatInput}
                   onChange={handleChatInputChange}
                   onKeyDown={(e) => {
@@ -415,7 +457,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                     if (autocompleteOpen && filteredAutocompleteItems.length > 0) {
                       if (e.key === "ArrowDown") {
                         e.preventDefault();
-                        setAutocompleteSelectedIndex(prev => 
+                        setAutocompleteSelectedIndex(prev =>
                           prev < filteredAutocompleteItems.length - 1 ? prev + 1 : prev
                         );
                         return;
@@ -438,11 +480,88 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                         return;
                       }
                     }
-                    
+
+                    // Message history navigation (up/down arrows when autocomplete is closed)
+                    if (!autocompleteOpen && messageHistory.length > 0) {
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+
+                        // If we're not already navigating history, save current input
+                        if (historyIndex === -1) {
+                          setOriginalInput(chatInput);
+                          setIsEditingHistory(true);
+                        }
+
+                        // Navigate to previous message (higher index = older message)
+                        const newIndex = historyIndex === -1 ? messageHistory.length - 1 : Math.max(0, historyIndex - 1);
+                        setHistoryIndex(newIndex);
+                        setChatInput(messageHistory[newIndex]);
+                        return;
+                      }
+
+                      if (e.key === "ArrowDown" && historyIndex !== -1) {
+                        e.preventDefault();
+
+                        // Navigate to next message (lower index = newer message)
+                        const newIndex = historyIndex + 1;
+
+                        if (newIndex >= messageHistory.length) {
+                          // Reached the end, restore original input
+                          setHistoryIndex(-1);
+                          setChatInput(originalInput);
+                          setIsEditingHistory(false);
+                        } else {
+                          setHistoryIndex(newIndex);
+                          setChatInput(messageHistory[newIndex]);
+                        }
+                        return;
+                      }
+                    }
+
+                    // Escape key - clear input or cancel editing
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      if (isEditingHistory) {
+                        // Cancel history navigation and restore original input
+                        setChatInput(originalInput);
+                        setHistoryIndex(-1);
+                        setIsEditingHistory(false);
+                      } else {
+                        // Clear input
+                        setChatInput('');
+                      }
+                      return;
+                    }
+
+                    // Ctrl+K / Cmd+K - Focus chat input (already focused, but clear it)
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                      e.preventDefault();
+                      setChatInput('');
+                      setHistoryIndex(-1);
+                      setIsEditingHistory(false);
+                      textareaRef.current?.focus();
+                      return;
+                    }
+
+                    // Ctrl+Enter / Cmd+Enter - Send message
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      if (chatInput.trim() && !sendingChat) {
+                        // Reset history navigation
+                        setHistoryIndex(-1);
+                        setIsEditingHistory(false);
+                        handleSendChat();
+                      }
+                      return;
+                    }
+
                     // Regular enter to send
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       if (chatInput.trim() && !sendingChat) {
+                        // Reset history navigation
+                        setHistoryIndex(-1);
+                        setIsEditingHistory(false);
                         handleSendChat();
                       }
                     }

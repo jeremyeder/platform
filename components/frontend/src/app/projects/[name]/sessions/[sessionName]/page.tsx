@@ -16,7 +16,10 @@ import {
   AlertTriangle,
   X,
   MoreVertical,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -146,6 +149,13 @@ export default function ProjectSessionDetailPage({
   const [repoChanging, setRepoChanging] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    // Load collapsed state from localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('acp-sidebar-collapsed') === 'true';
+    }
+    return false;
+  });
 
   // Directory browser state (unified for artifacts, repos, and workflow)
   const [selectedDirectory, setSelectedDirectory] = useState<DirectoryOption>({
@@ -171,6 +181,25 @@ export default function ProjectSessionDetailPage({
       } catch {}
     });
   }, [params]);
+
+  // Keyboard shortcut: Ctrl+B / Cmd+B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        setIsSidebarCollapsed(prev => {
+          const newState = !prev;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('acp-sidebar-collapsed', String(newState));
+          }
+          return newState;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Session queue hook (localStorage-backed)
   const sessionQueue = useSessionQueue(projectName, sessionName);
@@ -1452,35 +1481,54 @@ export default function ProjectSessionDetailPage({
         {/* Main content area */}
         <div className="flex-grow overflow-hidden bg-card">
           <div className="h-full">
-            <div className="h-full flex gap-6">
-              {/* Mobile sidebar overlay */}
-              {mobileMenuOpen && (
-                <div 
-                  className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
-                  onClick={() => setMobileMenuOpen(false)}
-                />
-              )}
+            {/* Mobile sidebar overlay */}
+            {mobileMenuOpen && (
+              <div
+                className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+            )}
 
-              {/* Left Column - Accordions - always show with state-based styling */}
-              {session && (
-                <div className={cn(
-                  "flex-[0_0_400px] min-w-[350px] max-w-[500px] flex flex-col sticky top-0 self-start h-[calc(100vh-8rem)] pt-6 pl-6 pr-6 bg-card relative",
-                  "md:flex md:pr-0",
-                  mobileMenuOpen ? "fixed left-0 top-16 z-50 shadow-lg" : "hidden",
-                  // Disable interactions when not running
-                  phase !== "Running" && "pointer-events-none"
-                )}>
-                  {/* Backdrop blur layer for entire sidebar */}
-                  {phase !== "Running" && (
+            {/* Resizable panel layout for desktop */}
+            <div className="h-full hidden md:block">
+              <PanelGroup direction="horizontal">
+                {/* Left Sidebar Panel */}
+                {session && (
+                  <Panel
+                    defaultSize={25}
+                    minSize={15}
+                    maxSize={40}
+                    collapsible
+                    collapsedSize={0}
+                    onCollapse={() => {
+                      setIsSidebarCollapsed(true);
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('acp-sidebar-collapsed', 'true');
+                      }
+                    }}
+                    onExpand={() => {
+                      setIsSidebarCollapsed(false);
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('acp-sidebar-collapsed', 'false');
+                      }
+                    }}
+                  >
                     <div className={cn(
-                      "absolute inset-0 z-[5] backdrop-blur-[1px]",
-                      ["Creating", "Pending", "Stopping"].includes(phase) && "bg-background/40",
-                      ["Stopped", "Completed", "Failed"].includes(phase) && "bg-background/50 backdrop-blur-[2px]"
-                    )} />
-                  )}
+                      "h-full flex flex-col pt-6 pl-6 pr-3 bg-card relative",
+                      // Disable interactions when not running
+                      phase !== "Running" && "pointer-events-none"
+                    )}>
+                      {/* Backdrop blur layer for entire sidebar */}
+                      {phase !== "Running" && (
+                        <div className={cn(
+                          "absolute inset-0 z-[5] backdrop-blur-[1px]",
+                          ["Creating", "Pending", "Stopping"].includes(phase) && "bg-background/40",
+                          ["Stopped", "Completed", "Failed"].includes(phase) && "bg-background/50 backdrop-blur-[2px]"
+                        )} />
+                      )}
 
-                  {/* State overlay for non-running sessions */}
-                  {phase !== "Running" && (
+                      {/* State overlay for non-running sessions */}
+                      {phase !== "Running" && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-auto">
                       <div className="text-center">
                         {/* Starting states */}
@@ -1577,6 +1625,21 @@ export default function ProjectSessionDetailPage({
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Desktop collapse button */}
+                <div className="hidden md:flex justify-between items-center mb-4">
+                  <h2 className="text-sm font-semibold text-muted-foreground">Workspace</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    className="h-7 w-7 p-0"
+                    title={isSidebarCollapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+                  >
+                    {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                  </Button>
+                </div>
+
                 <div className={cn(
                   "flex-grow pb-6",
                   ["Stopped", "Completed", "Failed"].includes(phase) && "blur-[2px]"
@@ -1968,12 +2031,19 @@ export default function ProjectSessionDetailPage({
                     </AccordionItem>
                   </Accordion>
                 </div>
-              </div>
-              )}
+                    </div>
+                  </Panel>
+                )}
 
-              {/* Right Column - Messages */}
-              <div className="flex-1 min-w-0 flex flex-col">
-                <Card className="relative flex-1 flex flex-col overflow-hidden py-0 border-0 rounded-none md:border-l">
+                {/* Resize Handle */}
+                <PanelResizeHandle className="w-1 bg-border hover:bg-primary/20 transition-colors cursor-col-resize relative group">
+                  <div className="absolute inset-y-0 -left-1 -right-1" />
+                </PanelResizeHandle>
+
+                {/* Chat Panel */}
+                <Panel defaultSize={75} minSize={50}>
+                  <div className="h-full flex flex-col">
+                    <Card className="relative flex-1 flex flex-col overflow-hidden py-0 border-0 rounded-none md:border-l">
                   <CardContent className="px-3 pt-0 pb-0 flex-1 flex flex-col overflow-hidden">
                     {/* Repository change overlay */}
                     {repoChanging && (
@@ -2036,6 +2106,77 @@ export default function ProjectSessionDetailPage({
                           }
                         />
                       </FeedbackProvider>
+                    </div>
+                  </CardContent>
+                </Card>
+                  </div>
+                </Panel>
+              </PanelGroup>
+            </div>
+
+            {/* Mobile layout (unchanged) */}
+            <div className="h-full md:hidden flex gap-6">
+              {session && (
+                <div className={cn(
+                  "flex-[0_0_400px] min-w-[350px] max-w-[500px] flex flex-col sticky top-0 self-start h-[calc(100vh-8rem)] pt-6 pl-6 pr-6 bg-card relative",
+                  mobileMenuOpen ? "fixed left-0 top-16 z-50 shadow-lg" : "hidden",
+                  phase !== "Running" && "pointer-events-none"
+                )}>
+                  {/* Mobile sidebar content - same as desktop but without panels */}
+                  {/* TODO: Extract sidebar content to component to avoid duplication */}
+                </div>
+              )}
+
+              {/* Mobile chat */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <Card className="relative flex-1 flex flex-col overflow-hidden py-0 border-0 rounded-none">
+                  <CardContent className="px-3 pt-0 pb-0 flex-1 flex flex-col overflow-hidden">
+                    {repoChanging && (
+                      <div className="absolute inset-0 bg-background/90 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                        <Alert className="max-w-md mx-4">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <AlertTitle>Updating Repositories...</AlertTitle>
+                          <AlertDescription>
+                            <div className="space-y-2">
+                              <p>Please wait while repositories are being updated. This may take 10-20 seconds...</p>
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                      <MessagesTab
+                        session={session}
+                        streamMessages={streamMessages}
+                        chatInput={chatInput}
+                        setChatInput={setChatInput}
+                        onSendChat={() => Promise.resolve(sendChat())}
+                        onInterrupt={aguiInterrupt}
+                        onEndSession={() => Promise.resolve(handleEndSession())}
+                        onGoToResults={() => {}}
+                        onContinue={handleContinue}
+                        workflowMetadata={workflowMetadata}
+                        onCommandClick={handleCommandClick}
+                        isRunActive={isRunActive}
+                        showWelcomeExperience={!["Completed", "Failed", "Stopped", "Stopping"].includes(session?.status?.phase || "")}
+                        activeWorkflow={workflowManagement.activeWorkflow}
+                        userHasInteracted={userHasInteracted}
+                        queuedMessages={sessionQueue.messages}
+                        hasRealMessages={hasRealMessages}
+                        welcomeExperienceComponent={
+                          <WelcomeExperience
+                            ootbWorkflows={ootbWorkflows}
+                            onWorkflowSelect={handleWelcomeWorkflowSelect}
+                            onUserInteraction={() => setUserHasInteracted(true)}
+                            userHasInteracted={userHasInteracted}
+                            sessionPhase={session?.status?.phase}
+                            hasRealMessages={hasRealMessages}
+                            onLoadWorkflow={() => setCustomWorkflowDialogOpen(true)}
+                            selectedWorkflow={workflowManagement.selectedWorkflow}
+                          />
+                        }
+                      />
                     </div>
                   </CardContent>
                 </Card>
