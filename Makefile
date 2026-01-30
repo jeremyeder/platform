@@ -1,9 +1,9 @@
-.PHONY: help setup build-all build-frontend build-backend build-operator build-runner build-state-sync deploy clean
+.PHONY: help setup build-all build-frontend build-backend build-operator build-runner build-state-sync deploy clean check-architecture
 .PHONY: local-up local-down local-clean local-status local-rebuild local-reload-backend local-reload-frontend local-reload-operator local-sync-version
 .PHONY: local-dev-token
 .PHONY: local-logs local-logs-backend local-logs-frontend local-logs-operator local-shell local-shell-frontend
 .PHONY: local-test local-test-dev local-test-quick test-all local-url local-troubleshoot local-port-forward local-stop-port-forward
-.PHONY: push-all registry-login setup-hooks remove-hooks check-minikube check-kubectl
+.PHONY: push-all registry-login setup-hooks remove-hooks check-minikube check-kind check-kubectl
 .PHONY: e2e-test e2e-setup e2e-clean deploy-langfuse-openshift
 .PHONY: setup-minio minio-console minio-logs minio-status
 .PHONY: validate-makefile lint-makefile check-shell makefile-health
@@ -14,7 +14,28 @@
 
 # Configuration
 CONTAINER_ENGINE ?= podman
-PLATFORM ?= linux/amd64
+
+# Auto-detect host architecture for native builds
+# Override with PLATFORM=linux/amd64 or PLATFORM=linux/arm64 if needed
+HOST_OS := $(shell uname -s)
+HOST_ARCH := $(shell uname -m)
+
+# Map uname output to Docker platform names
+ifeq ($(HOST_ARCH),arm64)
+    DETECTED_PLATFORM := linux/arm64
+else ifeq ($(HOST_ARCH),aarch64)
+    DETECTED_PLATFORM := linux/arm64
+else ifeq ($(HOST_ARCH),x86_64)
+    DETECTED_PLATFORM := linux/amd64
+else ifeq ($(HOST_ARCH),amd64)
+    DETECTED_PLATFORM := linux/amd64
+else
+    DETECTED_PLATFORM := linux/amd64
+    $(warning Unknown architecture $(HOST_ARCH), defaulting to linux/amd64)
+endif
+
+# Allow manual override via PLATFORM=...
+PLATFORM ?= $(DETECTED_PLATFORM)
 BUILD_FLAGS ?=
 NAMESPACE ?= ambient-code
 REGISTRY ?= quay.io/your-org
@@ -76,7 +97,7 @@ help: ## Display this help message
 	@echo '$(COLOR_BOLD)Configuration Variables:$(COLOR_RESET)'
 	@echo '  CONTAINER_ENGINE=$(CONTAINER_ENGINE)  (docker or podman)'
 	@echo '  NAMESPACE=$(NAMESPACE)'
-	@echo '  PLATFORM=$(PLATFORM)'
+	@echo '  PLATFORM=$(PLATFORM) (detected: $(DETECTED_PLATFORM) from $(HOST_OS)/$(HOST_ARCH))'
 	@echo ''
 	@echo '$(COLOR_BOLD)Examples:$(COLOR_RESET)'
 	@echo '  make local-up CONTAINER_ENGINE=docker'
@@ -273,7 +294,7 @@ local-sync-version: ## Sync version from git to local deployment manifests
 	@VERSION=$$(git describe --tags --always 2>/dev/null || echo "dev") && \
 	echo "  Using version: $$VERSION" && \
 	sed -i.bak "s|value: \"v.*\"|value: \"$$VERSION\"|" \
-	  components/manifests/minikube/frontend-deployment.yaml && \
+	components/manifests/minikube/frontend-deployment.yaml && \
 	rm -f components/manifests/minikube/frontend-deployment.yaml.bak && \
 	echo "  $(COLOR_GREEN)✓$(COLOR_RESET) Version synced to $$VERSION"
 
@@ -420,8 +441,8 @@ local-test-quick: check-kubectl check-minikube ## Quick smoke test of local envi
 	@kubectl get namespace $(NAMESPACE) >/dev/null 2>&1 && echo "$(COLOR_GREEN)✓$(COLOR_RESET) Namespace exists" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Namespace missing" && exit 1)
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Waiting for pods to be ready..."
 	@kubectl wait --for=condition=ready pod -l app=backend-api -n $(NAMESPACE) --timeout=60s >/dev/null 2>&1 && \
-	 kubectl wait --for=condition=ready pod -l app=frontend -n $(NAMESPACE) --timeout=60s >/dev/null 2>&1 && \
-	 echo "$(COLOR_GREEN)✓$(COLOR_RESET) Pods ready" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Pods not ready" && exit 1)
+	kubectl wait --for=condition=ready pod -l app=frontend -n $(NAMESPACE) --timeout=60s >/dev/null 2>&1 && \
+	echo "$(COLOR_GREEN)✓$(COLOR_RESET) Pods ready" || (echo "$(COLOR_RED)✗$(COLOR_RESET) Pods not ready" && exit 1)
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Testing backend health..."
 	@for i in 1 2 3 4 5; do \
 		curl -sf http://$$(minikube ip):30080/health >/dev/null 2>&1 && { echo "$(COLOR_GREEN)✓$(COLOR_RESET) Backend healthy"; break; } || { \
@@ -524,7 +545,7 @@ clean: ## Clean up Kubernetes resources
 
 ##@ Kind Local Development
 
-kind-up: ## Start kind cluster with Quay.io images (production-like)
+kind-up: check-kind check-kubectl ## Start kind cluster with Quay.io images (production-like)
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Starting kind cluster..."
 	@cd e2e && CONTAINER_ENGINE=$(CONTAINER_ENGINE) ./scripts/setup-kind.sh
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Waiting for API server to be accessible..."
@@ -622,19 +643,40 @@ check-minikube: ## Check if minikube is installed
 	@command -v minikube >/dev/null 2>&1 || \
 		(echo "$(COLOR_RED)✗$(COLOR_RESET) minikube not found. Install: https://minikube.sigs.k8s.io/docs/start/" && exit 1)
 
+check-kind: ## Check if kind is installed
+	@command -v kind >/dev/null 2>&1 || \
+		(echo "$(COLOR_RED)✗$(COLOR_RESET) kind not found. Install: https://kind.sigs.k8s.io/docs/user/quick-start/" && exit 1)
+
 check-kubectl: ## Check if kubectl is installed
 	@command -v kubectl >/dev/null 2>&1 || \
 		(echo "$(COLOR_RED)✗$(COLOR_RESET) kubectl not found. Install: https://kubernetes.io/docs/tasks/tools/" && exit 1)
 
+check-architecture: ## Validate build architecture matches host
+	@echo "$(COLOR_BOLD)Architecture Check$(COLOR_RESET)"
+	@echo "  Host: $(HOST_OS) / $(HOST_ARCH)"
+	@echo "  Detected Platform: $(DETECTED_PLATFORM)"
+	@echo "  Active Platform: $(PLATFORM)"
+	@if [ "$(PLATFORM)" != "$(DETECTED_PLATFORM)" ]; then \
+		echo ""; \
+		echo "$(COLOR_YELLOW)⚠  Cross-compilation active$(COLOR_RESET)"; \
+		echo "   Building $(PLATFORM) images on $(DETECTED_PLATFORM) host"; \
+		echo "   This will be slower (QEMU emulation)"; \
+		echo ""; \
+		echo "   To use native builds:"; \
+		echo "     make build-all PLATFORM=$(DETECTED_PLATFORM)"; \
+	else \
+		echo "$(COLOR_GREEN)✓$(COLOR_RESET) Using native architecture"; \
+	fi
+
 _build-and-load: ## Internal: Build and load images
-	@echo "  Building backend..."
-	@$(CONTAINER_ENGINE) build -t $(BACKEND_IMAGE) components/backend $(QUIET_REDIRECT)
-	@echo "  Building frontend..."
-	@$(CONTAINER_ENGINE) build -t $(FRONTEND_IMAGE) components/frontend $(QUIET_REDIRECT)
-	@echo "  Building operator..."
-	@$(CONTAINER_ENGINE) build -t $(OPERATOR_IMAGE) components/operator $(QUIET_REDIRECT)
-	@echo "  Building runner..."
-	@$(CONTAINER_ENGINE) build -t $(RUNNER_IMAGE) -f components/runners/claude-code-runner/Dockerfile components/runners $(QUIET_REDIRECT)
+	@echo "  Building backend ($(PLATFORM))..."
+	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(BACKEND_IMAGE) components/backend $(QUIET_REDIRECT)
+	@echo "  Building frontend ($(PLATFORM))..."
+	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(FRONTEND_IMAGE) components/frontend $(QUIET_REDIRECT)
+	@echo "  Building operator ($(PLATFORM))..."
+	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(OPERATOR_IMAGE) components/operator $(QUIET_REDIRECT)
+	@echo "  Building runner ($(PLATFORM))..."
+	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(RUNNER_IMAGE) -f components/runners/claude-code-runner/Dockerfile components/runners $(QUIET_REDIRECT)
 	@echo "  Tagging images with localhost prefix..."
 	@$(CONTAINER_ENGINE) tag $(BACKEND_IMAGE) localhost/$(BACKEND_IMAGE) 2>/dev/null || true
 	@$(CONTAINER_ENGINE) tag $(FRONTEND_IMAGE) localhost/$(FRONTEND_IMAGE) 2>/dev/null || true

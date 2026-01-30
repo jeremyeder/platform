@@ -40,7 +40,7 @@ jobs:
       claude-runner: ${{ steps.filter.outputs.claude-runner }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Check for component changes
         uses: dorny/paths-filter@v3
@@ -64,7 +64,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Cleanup Diskspace
       id: cleanup
@@ -207,7 +207,7 @@ jobs:
       
     - name: Upload test results
       if: failure()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: cypress-screenshots
         path: e2e/cypress/screenshots
@@ -216,7 +216,7 @@ jobs:
         
     - name: Upload test videos
       if: failure()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: cypress-videos
         path: e2e/cypress/videos

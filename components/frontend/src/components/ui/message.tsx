@@ -85,6 +85,16 @@ const defaultComponents: Components = {
   li: ({ children }) => (
     <li className="leading-relaxed">{children}</li>
   ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary hover:underline cursor-pointer"
+    >
+      {children}
+    </a>
+  ),
 };
 
 const LOADING_MESSAGES = [
@@ -218,7 +228,7 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>(
               !borderless && (isBot ? "bg-card" : "bg-border/30")
             )}>
               {/* Content */}
-              <div className={cn("text-sm text-foreground", !isBot && "py-2 px-4")}>
+              <div className={cn("text-sm text-foreground font-mono", !isBot && "py-2 px-4")}>
                 {isLoading ? (
                   <div>
                     <div className="text-sm text-muted-foreground mb-2">{content}</div>
