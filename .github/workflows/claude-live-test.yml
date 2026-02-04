@@ -140,7 +140,7 @@ jobs:
 
     - name: Create MCP configuration for Playwright
       run: |
-        mkdir -p /tmp/mcp
+        mkdir -p /tmp/mcp /tmp/test_output
         cat > /tmp/mcp/playwright-config.json << 'EOF'
         {
           "mcpServers": {
@@ -159,6 +159,12 @@ jobs:
         EOF
         echo "✅ MCP config created"
         cat /tmp/mcp/playwright-config.json
+        
+    - name: Test MCP server manually
+      run: |
+        echo "Testing if Playwright MCP server can start..."
+        timeout 10 npx @playwright/mcp --base-url http://localhost --output-dir /tmp/test_output --caps testing --headless || true
+        echo "MCP server test complete"
 
     - name: Create test prompt for Claude
       id: prompt
@@ -177,12 +183,13 @@ jobs:
         IMPORTANT: You have browser automation tools from Playwright MCP
 
         Your testing steps:
-        1. Use browser_navigate to go to http://localhost
-        2. Use browser_snapshot to see the page structure
-        3. Click "New Workspace" button and create workspace: e2e-claude-test-${{ github.event.pull_request.number }}
-        4. Test project deletion - try deleting multiple projects quickly
-        5. Take screenshots at key moments
-        6. Write findings to /tmp/test_output/test_report.md using the Write tool
+        1. Use playwright_browser_navigate to go to http://localhost
+        2. Use playwright_browser_snapshot to see the page structure
+        3. Click "New Workspace" button using playwright_browser_click
+        4. Create workspace: e2e-claude-test-${{ github.event.pull_request.number }}
+        5. Test project deletion - try deleting multiple projects quickly
+        6. Take screenshots with playwright_browser_take_screenshot
+        7. Write findings to /tmp/test_output/test_report.md using the Write tool
 
         Focus on testing the race condition fix for rapid project deletions.
         PROMPT_EOF
@@ -204,12 +211,13 @@ jobs:
         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
         github_token: ${{ secrets.GITHUB_TOKEN }}
         prompt: ${{ steps.prompt.outputs.prompt }}
+        show_full_output: true
         claude_args: |
           --mcp-config /tmp/mcp/playwright-config.json
           --max-turns 30
           --model claude-sonnet-4-5-20250929
-          --allowedTools "browser_*,Read,Write,List,WebFetch"
-          --disallowedTools "Bash"
+          --allowedTools "playwright_*,Read,Write,List"
+          --disallowedTools "Bash,WebFetch"
 
     - name: Upload test report and screenshots
       if: always()
