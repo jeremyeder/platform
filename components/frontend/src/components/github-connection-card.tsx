@@ -9,7 +9,7 @@ import { Loader2, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react'
 import { useDisconnectGitHub, useSaveGitHubPAT, useDeleteGitHubPAT } from '@/services/queries'
 import { successToast, errorToast } from '@/hooks/use-toast'
 
-type Props = { 
+type Props = {
   appSlug?: string
   showManageButton?: boolean
   status?: {
