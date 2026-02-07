@@ -1,5 +1,5 @@
-.PHONY: help setup build-all build-frontend build-backend build-operator build-runner build-state-sync build-public-api deploy clean check-architecture
-.PHONY: local-up local-down local-clean local-status local-rebuild local-reload-backend local-reload-frontend local-reload-operator local-sync-version
+.PHONY: help setup build-all build-frontend build-frontend-next build-backend build-operator build-runner build-state-sync build-public-api deploy clean check-architecture
+.PHONY: local-up local-down local-clean local-status local-rebuild local-reload-backend local-reload-frontend local-reload-frontend-next local-reload-operator local-sync-version
 .PHONY: local-dev-token
 .PHONY: local-logs local-logs-backend local-logs-frontend local-logs-operator local-shell local-shell-frontend
 .PHONY: local-test local-test-dev local-test-quick test-all local-url local-troubleshoot local-port-forward local-stop-port-forward
@@ -60,6 +60,11 @@ OPERATOR_IMAGE ?= vteam_operator:latest
 RUNNER_IMAGE ?= vteam_claude_runner:latest
 STATE_SYNC_IMAGE ?= vteam_state_sync:latest
 PUBLIC_API_IMAGE ?= vteam_public_api:latest
+FRONTEND_NEXT_IMAGE ?= vteam_frontend_next:latest
+
+# Frontend variant: 'frontend' (default) or 'frontend-next' (LibreChat reskin)
+# Usage: make local-up FRONTEND_VARIANT=frontend-next
+FRONTEND_VARIANT ?= frontend
 
 # Vertex AI Configuration (for LOCAL_VERTEX=true)
 # These inherit from environment if set, or can be overridden on command line
@@ -122,6 +127,12 @@ build-frontend: ## Build frontend image
 	@cd components/frontend && $(CONTAINER_ENGINE) build $(PLATFORM_FLAG) $(BUILD_FLAGS) \
 		-t $(FRONTEND_IMAGE) .
 	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend built: $(FRONTEND_IMAGE)"
+
+build-frontend-next: ## Build frontend-next image (LibreChat reskin)
+	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Building frontend-next with $(CONTAINER_ENGINE)..."
+	@cd components/frontend-next && $(CONTAINER_ENGINE) build $(PLATFORM_FLAG) $(BUILD_FLAGS) \
+		-t $(FRONTEND_NEXT_IMAGE) .
+	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend-next built: $(FRONTEND_NEXT_IMAGE)"
 
 build-backend: ## Build backend image
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Building backend with $(CONTAINER_ENGINE)..."
@@ -365,6 +376,29 @@ local-reload-frontend: ## Rebuild and reload frontend only
 		echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend port forward restarted"; \
 	fi
 
+
+local-reload-frontend-next: ## Rebuild and reload frontend-next only (LibreChat reskin)
+	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Rebuilding frontend-next..."
+	@cd components/frontend-next && $(CONTAINER_ENGINE) build -t $(FRONTEND_NEXT_IMAGE) . >/dev/null 2>&1
+	@$(CONTAINER_ENGINE) tag $(FRONTEND_NEXT_IMAGE) localhost/$(FRONTEND_NEXT_IMAGE) 2>/dev/null || true
+	@$(CONTAINER_ENGINE) save -o /tmp/frontend-next-reload.tar localhost/$(FRONTEND_NEXT_IMAGE)
+	@minikube image load /tmp/frontend-next-reload.tar >/dev/null 2>&1
+	@rm -f /tmp/frontend-next-reload.tar
+	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Restarting frontend-next..."
+	@kubectl rollout restart deployment/frontend-next -n $(NAMESPACE) >/dev/null 2>&1
+	@kubectl rollout status deployment/frontend-next -n $(NAMESPACE) --timeout=60s
+	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend-next reloaded"
+	@OS=$$(uname -s); \
+	if [ "$$OS" = "Darwin" ] && [ "$(CONTAINER_ENGINE)" = "podman" ]; then \
+		echo "$(COLOR_BLUE)▶$(COLOR_RESET) Restarting frontend-next port forward..."; \
+		if [ -f /tmp/ambient-code/port-forward-frontend-next.pid ]; then \
+			kill $$(cat /tmp/ambient-code/port-forward-frontend-next.pid) 2>/dev/null || true; \
+		fi; \
+		kubectl port-forward -n $(NAMESPACE) svc/frontend-next-service 3001:3000 > /tmp/ambient-code/port-forward-frontend-next.log 2>&1 & \
+		echo $$! > /tmp/ambient-code/port-forward-frontend-next.pid; \
+		sleep 2; \
+		echo "$(COLOR_GREEN)✓$(COLOR_RESET) Frontend-next port forward restarted"; \
+	fi
 
 local-reload-operator: ## Rebuild and reload operator only
 	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Rebuilding operator..."
@@ -694,21 +728,34 @@ check-architecture: ## Validate build architecture matches host
 _build-and-load: ## Internal: Build and load images
 	@echo "  Building backend ($(PLATFORM))..."
 	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(BACKEND_IMAGE) components/backend $(QUIET_REDIRECT)
-	@echo "  Building frontend ($(PLATFORM))..."
-	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(FRONTEND_IMAGE) components/frontend $(QUIET_REDIRECT)
+	@if [ "$(FRONTEND_VARIANT)" = "frontend-next" ]; then \
+		echo "  Building frontend-next ($(PLATFORM))..."; \
+		$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(FRONTEND_NEXT_IMAGE) components/frontend-next $(QUIET_REDIRECT); \
+	else \
+		echo "  Building frontend ($(PLATFORM))..."; \
+		$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(FRONTEND_IMAGE) components/frontend $(QUIET_REDIRECT); \
+	fi
 	@echo "  Building operator ($(PLATFORM))..."
 	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(OPERATOR_IMAGE) components/operator $(QUIET_REDIRECT)
 	@echo "  Building runner ($(PLATFORM))..."
 	@$(CONTAINER_ENGINE) build $(PLATFORM_FLAG) -t $(RUNNER_IMAGE) -f components/runners/claude-code-runner/Dockerfile components/runners $(QUIET_REDIRECT)
 	@echo "  Tagging images with localhost prefix..."
 	@$(CONTAINER_ENGINE) tag $(BACKEND_IMAGE) localhost/$(BACKEND_IMAGE) 2>/dev/null || true
-	@$(CONTAINER_ENGINE) tag $(FRONTEND_IMAGE) localhost/$(FRONTEND_IMAGE) 2>/dev/null || true
+	@if [ "$(FRONTEND_VARIANT)" = "frontend-next" ]; then \
+		$(CONTAINER_ENGINE) tag $(FRONTEND_NEXT_IMAGE) localhost/$(FRONTEND_NEXT_IMAGE) 2>/dev/null || true; \
+	else \
+		$(CONTAINER_ENGINE) tag $(FRONTEND_IMAGE) localhost/$(FRONTEND_IMAGE) 2>/dev/null || true; \
+	fi
 	@$(CONTAINER_ENGINE) tag $(OPERATOR_IMAGE) localhost/$(OPERATOR_IMAGE) 2>/dev/null || true
 	@$(CONTAINER_ENGINE) tag $(RUNNER_IMAGE) localhost/$(RUNNER_IMAGE) 2>/dev/null || true
 	@echo "  Loading images into minikube..."
 	@mkdir -p /tmp/minikube-images
 	@$(CONTAINER_ENGINE) save -o /tmp/minikube-images/backend.tar localhost/$(BACKEND_IMAGE)
-	@$(CONTAINER_ENGINE) save -o /tmp/minikube-images/frontend.tar localhost/$(FRONTEND_IMAGE)
+	@if [ "$(FRONTEND_VARIANT)" = "frontend-next" ]; then \
+		$(CONTAINER_ENGINE) save -o /tmp/minikube-images/frontend.tar localhost/$(FRONTEND_NEXT_IMAGE); \
+	else \
+		$(CONTAINER_ENGINE) save -o /tmp/minikube-images/frontend.tar localhost/$(FRONTEND_IMAGE); \
+	fi
 	@$(CONTAINER_ENGINE) save -o /tmp/minikube-images/operator.tar localhost/$(OPERATOR_IMAGE)
 	@$(CONTAINER_ENGINE) save -o /tmp/minikube-images/runner.tar localhost/$(RUNNER_IMAGE)
 	@minikube image load /tmp/minikube-images/backend.tar $(QUIET_REDIRECT)
