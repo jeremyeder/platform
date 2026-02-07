@@ -15,42 +15,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Build-time metadata (set via -ldflags -X during build)
-// These are embedded directly in the binary, so they're always accurate
-var (
-	GitCommit  = "unknown"
-	GitBranch  = "unknown"
-	GitVersion = "unknown"
-	BuildDate  = "unknown"
-)
-
-func logBuildInfo() {
-	log.Println("==============================================")
-	log.Println("Backend API - Build Information")
-	log.Println("==============================================")
-	log.Printf("Version:     %s", GitVersion)
-	log.Printf("Commit:      %s", GitCommit)
-	log.Printf("Branch:      %s", GitBranch)
-	log.Printf("Repository:  %s", getEnvOrDefault("GIT_REPO", "unknown"))
-	log.Printf("Built:       %s", BuildDate)
-	log.Printf("Built by:    %s", getEnvOrDefault("BUILD_USER", "unknown"))
-	log.Println("==============================================")
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
 func main() {
 	// Load environment from .env in development if present
 	_ = godotenv.Overload(".env.local")
 	_ = godotenv.Overload(".env")
-
-	// Log build information
-	logBuildInfo()
 
 	// Content service mode - minimal initialization, no K8s access needed
 	if os.Getenv("CONTENT_SERVICE_MODE") == "true" {
@@ -67,7 +35,6 @@ func main() {
 		handlers.GitCheckMergeStatus = git.CheckMergeStatus
 		handlers.GitPullRepo = git.PullRepo
 		handlers.GitPushToRepo = git.PushToRepo
-		handlers.GitSyncRepo = git.SyncRepo
 		handlers.GitCreateBranch = git.CreateBranch
 		handlers.GitListRemoteBranches = git.ListRemoteBranches
 
@@ -94,25 +61,7 @@ func main() {
 	// Initialize git package
 	git.GetProjectSettingsResource = k8s.GetProjectSettingsResource
 	git.GetGitHubInstallation = func(ctx context.Context, userID string) (interface{}, error) {
-		installation, err := github.GetInstallation(ctx, userID)
-		if installation == nil {
-			return nil, err
-		}
-		return installation, err
-	}
-	git.GetGitHubPATCredentials = func(ctx context.Context, userID string) (interface{}, error) {
-		creds, err := handlers.GetGitHubPATCredentials(ctx, userID)
-		if creds == nil {
-			return nil, err
-		}
-		return creds, err
-	}
-	git.GetGitLabCredentials = func(ctx context.Context, userID string) (interface{}, error) {
-		creds, err := handlers.GetGitLabCredentials(ctx, userID)
-		if creds == nil {
-			return nil, err
-		}
-		return creds, err
+		return github.GetInstallation(ctx, userID)
 	}
 	git.GitHubTokenManager = github.Manager
 	git.GetBackendNamespace = func() string {
@@ -127,7 +76,6 @@ func main() {
 	handlers.GitCheckMergeStatus = git.CheckMergeStatus
 	handlers.GitPullRepo = git.PullRepo
 	handlers.GitPushToRepo = git.PushToRepo
-	handlers.GitSyncRepo = git.SyncRepo
 	handlers.GitCreateBranch = git.CreateBranch
 	handlers.GitListRemoteBranches = git.ListRemoteBranches
 
@@ -144,15 +92,13 @@ func main() {
 	// Initialize session handlers
 	handlers.GetAgenticSessionV1Alpha1Resource = k8s.GetAgenticSessionV1Alpha1Resource
 	handlers.DynamicClient = server.DynamicClient
-	handlers.GetGitHubToken = handlers.WrapGitHubTokenForRepo(git.GetGitHubToken)
-	handlers.GetGitLabToken = git.GetGitLabToken
+	handlers.GetGitHubToken = git.GetGitHubToken
 	handlers.DeriveRepoFolderFromURL = git.DeriveRepoFolderFromURL
-	// LEGACY: SendMessageToSession removed - AG-UI server uses HTTP/SSE instead of WebSocket
+	handlers.SendMessageToSession = websocket.SendMessageToSession
 
-	// Initialize repo handlers (default implementation already set in client_selection.go)
-	// GetK8sClientsForRequestRepoFunc uses getK8sClientsForRequestRepoDefault by default
-	handlers.GetGitHubTokenRepo = handlers.WrapGitHubTokenForRepo(git.GetGitHubToken)
-	handlers.DoGitHubRequest = nil // nil means use doGitHubRequest (default implementation)
+	// Initialize repo handlers
+	handlers.GetK8sClientsForRequestRepo = handlers.GetK8sClientsForRequest
+	handlers.GetGitHubTokenRepo = git.GetGitHubToken
 
 	// Initialize middleware
 	handlers.BaseKubeConfig = server.BaseKubeConfig

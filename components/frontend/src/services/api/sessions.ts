@@ -14,34 +14,10 @@ import type {
   StopAgenticSessionResponse,
   CloneAgenticSessionRequest,
   CloneAgenticSessionResponse,
+  Message,
+  GetSessionMessagesResponse,
   PaginationParams,
 } from '@/types/api';
-
-export type McpToolAnnotations = {
-  readOnly?: boolean;
-  destructive?: boolean;
-  idempotent?: boolean;
-  openWorld?: boolean;
-  [key: string]: boolean | undefined;
-};
-
-export type McpTool = {
-  name: string;
-  annotations: McpToolAnnotations;
-};
-
-export type McpServer = {
-  name: string;
-  displayName: string;
-  status: string;
-  version?: string;
-  tools?: McpTool[];
-};
-
-export type McpStatusResponse = {
-  servers: McpServer[];
-  totalCount: number;
-};
 
 /**
  * List sessions for a project with pagination support
@@ -148,7 +124,18 @@ export async function cloneSession(
   return response.session;
 }
 
-// getSessionMessages removed - replaced by AG-UI protocol
+/**
+ * Get session messages
+ */
+export async function getSessionMessages(
+  projectName: string,
+  sessionName: string
+): Promise<Message[]> {
+  const response = await apiClient.get<GetSessionMessagesResponse>(
+    `/projects/${projectName}/agentic-sessions/${sessionName}/messages`
+  );
+  return response.messages;
+}
 
 /**
  * Delete a session
@@ -160,7 +147,33 @@ export async function deleteSession(
   await apiClient.delete(`/projects/${projectName}/agentic-sessions/${sessionName}`);
 }
 
-// sendChatMessage and sendControlMessage removed - use AG-UI protocol
+/**
+ * Send a chat message to an interactive session
+ */
+export async function sendChatMessage(
+  projectName: string,
+  sessionName: string,
+  content: string
+): Promise<void> {
+  await apiClient.post<void, { content: string }>(
+    `/projects/${projectName}/agentic-sessions/${sessionName}/messages`,
+    { content }
+  );
+}
+
+/**
+ * Send a control message (interrupt, end_session) to a session
+ */
+export async function sendControlMessage(
+  projectName: string,
+  sessionName: string,
+  type: 'interrupt' | 'end_session'
+): Promise<void> {
+  await apiClient.post<void, { type: string }>(
+    `/projects/${projectName}/agentic-sessions/${sessionName}/messages`,
+    { type }
+  );
+}
 
 /**
  * Get K8s resource information (job, pods, PVC) for a session
@@ -199,61 +212,5 @@ export async function updateSessionDisplayName(
   return apiClient.put<AgenticSession, { displayName: string }>(
     `/projects/${projectName}/agentic-sessions/${sessionName}/displayname`,
     { displayName }
-  );
-}
-
-/**
- * Export session chat data
- */
-export type SessionExportResponse = {
-  sessionId: string;
-  projectName: string;
-  exportDate: string;
-  aguiEvents: unknown[];
-  legacyMessages?: unknown[];
-  hasLegacy: boolean;
-};
-
-export async function getSessionExport(
-  projectName: string,
-  sessionName: string
-): Promise<SessionExportResponse> {
-  return apiClient.get(`/projects/${projectName}/agentic-sessions/${sessionName}/export`);
-}
-
-/**
- * Get MCP server status for a session
- */
-export async function getMcpStatus(
-  projectName: string,
-  sessionName: string
-): Promise<McpStatusResponse> {
-  return apiClient.get<McpStatusResponse>(
-    `/projects/${projectName}/agentic-sessions/${sessionName}/mcp/status`
-  );
-}
-
-export type RepoStatus = {
-  url: string;
-  name: string;
-  branches: string[];
-  currentActiveBranch: string;
-  defaultBranch: string;
-};
-
-export type ReposStatusResponse = {
-  repos: RepoStatus[];
-};
-
-/**
- * Get current status of all repositories (branches, current branch, etc.)
- * Fetches directly from runner for real-time updates
- */
-export async function getReposStatus(
-  projectName: string,
-  sessionName: string
-): Promise<ReposStatusResponse> {
-  return apiClient.get<ReposStatusResponse>(
-    `/projects/${projectName}/agentic-sessions/${sessionName}/repos/status`
   );
 }

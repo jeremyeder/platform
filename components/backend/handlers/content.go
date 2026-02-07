@@ -4,20 +4,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"ambient-code-backend/git"
-	"ambient-code-backend/pathutil"
-	"ambient-code-backend/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,63 +27,12 @@ var (
 	GitPushRepo           func(ctx context.Context, repoDir, commitMessage, outputRepoURL, branch, githubToken string) (string, error)
 	GitAbandonRepo        func(ctx context.Context, repoDir string) error
 	GitDiffRepo           func(ctx context.Context, repoDir string) (*git.DiffSummary, error)
-	GitCheckMergeStatus   func(ctx context.Context, repoDir, branch, githubToken string) (*git.MergeStatus, error)
-	GitPullRepo           func(ctx context.Context, repoDir, branch, githubToken string) error
-	GitPushToRepo         func(ctx context.Context, repoDir, branch, commitMessage, githubToken string) error
+	GitCheckMergeStatus   func(ctx context.Context, repoDir, branch string) (*git.MergeStatus, error)
+	GitPullRepo           func(ctx context.Context, repoDir, branch string) error
+	GitPushToRepo         func(ctx context.Context, repoDir, branch, commitMessage string) error
 	GitCreateBranch       func(ctx context.Context, repoDir, branchName string) error
 	GitListRemoteBranches func(ctx context.Context, repoDir string) ([]string, error)
-	GitSyncRepo           func(ctx context.Context, repoDir, commitMessage, branch, githubToken string) error
-	// GetRemoteURL retrieves the origin remote URL - mockable for testing
-	GetRemoteURL func(ctx context.Context, repoDir string) (string, error)
 )
-
-// getGitHubTokenFromContext extracts GitHub token from request header or environment
-func getGitHubTokenFromContext(c *gin.Context) string {
-	// Prefer header (passed by backend)
-	if token := strings.TrimSpace(c.GetHeader("X-GitHub-Token")); token != "" {
-		return token
-	}
-	// Fall back to env var (injected via EnvFrom)
-	return strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
-}
-
-// getGitLabTokenFromContext extracts GitLab token from request header or environment
-func getGitLabTokenFromContext(c *gin.Context) string {
-	// Prefer header (passed by backend)
-	if token := strings.TrimSpace(c.GetHeader("X-GitLab-Token")); token != "" {
-		return token
-	}
-	// Fall back to env var (injected via EnvFrom)
-	return strings.TrimSpace(os.Getenv("GITLAB_TOKEN"))
-}
-
-// getGitTokenForURL returns the appropriate token based on the repository URL
-func getGitTokenForURL(c *gin.Context, repoURL string) string {
-	provider := types.DetectProvider(repoURL)
-	if provider == types.ProviderGitLab {
-		return getGitLabTokenFromContext(c)
-	}
-	// Default to GitHub token for github.com or unknown providers
-	return getGitHubTokenFromContext(c)
-}
-
-// defaultGetRemoteURL is the default implementation of GetRemoteURL
-func defaultGetRemoteURL(ctx context.Context, repoDir string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
-	cmd.Dir = repoDir
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("no remote configured: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-func init() {
-	// Set default implementation if not already set (allows test mocking)
-	if GetRemoteURL == nil {
-		GetRemoteURL = defaultGetRemoteURL
-	}
-}
 
 // ContentGitPush handles POST /content/github/push in CONTENT_SERVICE_MODE
 func ContentGitPush(c *gin.Context) {
@@ -117,7 +61,7 @@ func ContentGitPush(c *gin.Context) {
 	}
 
 	// Basic safety: repoDir must be under StateBaseDir
-	if !pathutil.IsPathWithinBase(repoDir, StateBaseDir) && repoDir != StateBaseDir {
+	if !strings.HasPrefix(repoDir+string(os.PathSeparator), StateBaseDir+string(os.PathSeparator)) && repoDir != StateBaseDir {
 		log.Printf("contentGitPush: invalid repoPath resolved=%q stateBaseDir=%q", repoDir, StateBaseDir)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid repoPath"})
 		return
@@ -125,12 +69,12 @@ func ContentGitPush(c *gin.Context) {
 
 	log.Printf("contentGitPush: using repoDir=%q (stateBaseDir=%q)", repoDir, StateBaseDir)
 
-	// Get appropriate token based on repository URL
-	gitToken := getGitTokenForURL(c, body.OutputRepoURL)
-	log.Printf("contentGitPush: tokenHeaderPresent=%t url.host.redacted=%t branch=%q", gitToken != "", strings.HasPrefix(body.OutputRepoURL, "https://"), body.Branch)
+	// Optional GitHub token provided by backend via internal header
+	gitHubToken := strings.TrimSpace(c.GetHeader("X-GitHub-Token"))
+	log.Printf("contentGitPush: tokenHeaderPresent=%t url.host.redacted=%t branch=%q", gitHubToken != "", strings.HasPrefix(body.OutputRepoURL, "https://"), body.Branch)
 
 	// Call refactored git push function
-	out, err := GitPushRepo(c.Request.Context(), repoDir, body.CommitMessage, body.OutputRepoURL, body.Branch, gitToken)
+	out, err := GitPushRepo(c.Request.Context(), repoDir, body.CommitMessage, body.OutputRepoURL, body.Branch, gitHubToken)
 	if err != nil {
 		if out == "" {
 			// No changes to commit
@@ -157,7 +101,7 @@ func ContentGitAbandon(c *gin.Context) {
 		repoDir = StateBaseDir
 	}
 
-	if !pathutil.IsPathWithinBase(repoDir, StateBaseDir) && repoDir != StateBaseDir {
+	if !strings.HasPrefix(repoDir+string(os.PathSeparator), StateBaseDir+string(os.PathSeparator)) && repoDir != StateBaseDir {
 		log.Printf("contentGitAbandon: invalid repoPath resolved=%q base=%q", repoDir, StateBaseDir)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid repoPath"})
 		return
@@ -182,7 +126,7 @@ func ContentGitDiff(c *gin.Context) {
 	}
 
 	repoDir := filepath.Clean(filepath.Join(StateBaseDir, repoPath))
-	if !pathutil.IsPathWithinBase(repoDir, StateBaseDir) && repoDir != StateBaseDir {
+	if !strings.HasPrefix(repoDir+string(os.PathSeparator), StateBaseDir+string(os.PathSeparator)) && repoDir != StateBaseDir {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid repoPath"})
 		return
 	}
@@ -215,12 +159,12 @@ func ContentGitDiff(c *gin.Context) {
 // ContentGitStatus handles GET /content/git-status?path=
 func ContentGitStatus(c *gin.Context) {
 	path := filepath.Clean("/" + strings.TrimSpace(c.Query("path")))
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
+
+	abs := filepath.Join(StateBaseDir, path)
 
 	// Check if directory exists
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
@@ -241,19 +185,6 @@ func ContentGitStatus(c *gin.Context) {
 		return
 	}
 
-	// Get current branch
-	branchCmd := exec.CommandContext(c.Request.Context(), "git", "rev-parse", "--abbrev-ref", "HEAD")
-	branchCmd.Dir = abs
-	branchOut, _ := branchCmd.Output()
-	currentBranch := strings.TrimSpace(string(branchOut))
-
-	// Check if remote is configured
-	remoteCmd := exec.CommandContext(c.Request.Context(), "git", "remote", "get-url", "origin")
-	remoteCmd.Dir = abs
-	remoteOut, remoteErr := remoteCmd.Output()
-	remoteURL := strings.TrimSpace(string(remoteOut))
-	hasRemote := remoteErr == nil && remoteURL != ""
-
 	// Get git status using existing git package
 	summary, err := GitDiffRepo(c.Request.Context(), abs)
 	if err != nil {
@@ -261,9 +192,6 @@ func ContentGitStatus(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"initialized": true,
 			"hasChanges":  false,
-			"branch":      currentBranch,
-			"remoteUrl":   remoteURL,
-			"hasRemote":   hasRemote,
 		})
 		return
 	}
@@ -273,9 +201,6 @@ func ContentGitStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"initialized":      true,
 		"hasChanges":       hasChanges,
-		"branch":           currentBranch,
-		"remoteUrl":        remoteURL,
-		"hasRemote":        hasRemote,
 		"filesAdded":       summary.FilesAdded,
 		"filesRemoved":     summary.FilesRemoved,
 		"uncommittedFiles": summary.FilesAdded + summary.FilesRemoved,
@@ -299,12 +224,12 @@ func ContentGitConfigureRemote(c *gin.Context) {
 	}
 
 	path := filepath.Clean("/" + body.Path)
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
+
+	abs := filepath.Join(StateBaseDir, path)
 
 	// Check if directory exists
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
@@ -322,14 +247,13 @@ func ContentGitConfigureRemote(c *gin.Context) {
 		log.Printf("Initialized git repository at %s", abs)
 	}
 
-	// Get appropriate token and inject into URL for authentication
-	// SECURITY: remoteURL may contain embedded token after injection - never log it
+	// Get GitHub token and inject into URL for authentication
 	remoteURL := body.RemoteURL
-	token := getGitTokenForURL(c, body.RemoteURL)
-	if token != "" {
-		if authenticatedURL, err := git.InjectGitToken(remoteURL, token); err == nil {
+	gitHubToken := strings.TrimSpace(c.GetHeader("X-GitHub-Token"))
+	if gitHubToken != "" {
+		if authenticatedURL, err := git.InjectGitHubToken(remoteURL, gitHubToken); err == nil {
 			remoteURL = authenticatedURL
-			log.Printf("ContentConfigureRemote: configured authentication for provider=%s tokenLen=%d", types.DetectProvider(body.RemoteURL), len(token))
+			log.Printf("Injected GitHub token into remote URL")
 		}
 	}
 
@@ -377,12 +301,12 @@ func ContentGitSync(c *gin.Context) {
 	}
 
 	path := filepath.Clean("/" + body.Path)
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
+
+	abs := filepath.Join(StateBaseDir, path)
 
 	// Check if git repo exists
 	gitDir := filepath.Join(abs, ".git")
@@ -391,20 +315,9 @@ func ContentGitSync(c *gin.Context) {
 		return
 	}
 
-	// Get remote URL to determine which token to use
-	remoteURL, err := GetRemoteURL(c.Request.Context(), abs)
-	if err != nil {
-		log.Printf("ContentGitSync: failed to get remote URL for %s: %v", abs, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no remote configured"})
-		return
-	}
-
-	// Perform git sync operations with authentication
-	gitToken := getGitTokenForURL(c, remoteURL)
-	if err := GitSyncRepo(c.Request.Context(), abs, body.Message, body.Branch, gitToken); err != nil {
-		// Log actual error for debugging, but return generic message to avoid leaking internal details
-		log.Printf("Internal server error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+	// Perform git sync operations
+	if err := git.SyncRepo(c.Request.Context(), abs, body.Message, body.Branch); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -430,13 +343,12 @@ func ContentWrite(c *gin.Context) {
 	log.Printf("ContentWrite: path=%q contentLen=%d encoding=%q StateBaseDir=%q", req.Path, len(req.Content), req.Encoding, StateBaseDir)
 
 	path := filepath.Clean("/" + strings.TrimSpace(req.Path))
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
-		log.Printf("ContentWrite: path traversal attempt rejected: path=%q abs=%q", path, abs)
+	if path == "/" || strings.Contains(path, "..") {
+		log.Printf("ContentWrite: invalid path rejected: path=%q", path)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
+	abs := filepath.Join(StateBaseDir, path)
 	log.Printf("ContentWrite: absolute path=%q", abs)
 
 	if err := os.MkdirAll(filepath.Dir(abs), 0755); err != nil {
@@ -471,13 +383,12 @@ func ContentRead(c *gin.Context) {
 	log.Printf("ContentRead: requested path=%q StateBaseDir=%q", c.Query("path"), StateBaseDir)
 	log.Printf("ContentRead: cleaned path=%q", path)
 
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
-		log.Printf("ContentRead: path traversal attempt rejected: path=%q abs=%q", path, abs)
+	if path == "/" || strings.Contains(path, "..") {
+		log.Printf("ContentRead: invalid path rejected: path=%q", path)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
+	abs := filepath.Join(StateBaseDir, path)
 	log.Printf("ContentRead: absolute path=%q", abs)
 
 	b, err := os.ReadFile(abs)
@@ -501,13 +412,12 @@ func ContentList(c *gin.Context) {
 	log.Printf("ContentList: cleaned path=%q", path)
 	log.Printf("ContentList: StateBaseDir=%q", StateBaseDir)
 
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
-		log.Printf("ContentList: path traversal attempt rejected: path=%q abs=%q", path, abs)
+	if path == "/" || strings.Contains(path, "..") {
+		log.Printf("ContentList: invalid path rejected: path=%q", path)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
+	abs := filepath.Join(StateBaseDir, path)
 	log.Printf("ContentList: absolute path=%q", abs)
 
 	info, err := os.Stat(abs)
@@ -595,45 +505,21 @@ func ContentWorkflowMetadata(c *gin.Context) {
 					displayName = commandName
 				}
 
-				// Parse order field from frontmatter, default to MaxInt32 for unordered commands
-				order := int(^uint(0) >> 1) // MaxInt
-				if orderStr := metadata["order"]; orderStr != "" {
-					if parsed, err := strconv.Atoi(orderStr); err == nil {
-						order = parsed
-					}
+				// Extract short command (last segment after final dot)
+				shortCommand := commandName
+				if lastDot := strings.LastIndex(commandName, "."); lastDot != -1 {
+					shortCommand = commandName[lastDot+1:]
 				}
 
-				// Use full command name as slash command (e.g., /speckit.rfe.start)
 				commands = append(commands, map[string]interface{}{
 					"id":           commandName,
 					"name":         displayName,
 					"description":  metadata["description"],
-					"slashCommand": "/" + commandName,
+					"slashCommand": "/" + shortCommand,
 					"icon":         metadata["icon"],
-					"order":        order,
 				})
 			}
 		}
-
-		// Sort commands by order field (ascending)
-		sort.Slice(commands, func(i, j int) bool {
-			iOrder, iOk := commands[i]["order"].(int)
-			jOrder, jOk := commands[j]["order"].(int)
-			if !iOk {
-				iOrder = int(^uint(0) >> 1) // MaxInt
-			}
-			if !jOk {
-				jOrder = int(^uint(0) >> 1) // MaxInt
-			}
-			// If orders are equal, sort alphabetically by id for consistent ordering
-			if iOrder == jOrder {
-				iID, _ := commands[i]["id"].(string)
-				jID, _ := commands[j]["id"].(string)
-				return iID < jID
-			}
-			return iOrder < jOrder
-		})
-
 		log.Printf("ContentWorkflowMetadata: found %d commands", len(commands))
 	} else {
 		log.Printf("ContentWorkflowMetadata: commands directory not found or unreadable: %v", err)
@@ -663,20 +549,15 @@ func ContentWorkflowMetadata(c *gin.Context) {
 		log.Printf("ContentWorkflowMetadata: agents directory not found or unreadable: %v", err)
 	}
 
-	configResponse := gin.H{
-		"name":         ambientConfig.Name,
-		"description":  ambientConfig.Description,
-		"systemPrompt": ambientConfig.SystemPrompt,
-		"artifactsDir": ambientConfig.ArtifactsDir,
-	}
-	if ambientConfig.Rubric != nil {
-		configResponse["rubric"] = ambientConfig.Rubric
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"commands": commands,
 		"agents":   agents,
-		"config":   configResponse,
+		"config": gin.H{
+			"name":         ambientConfig.Name,
+			"description":  ambientConfig.Description,
+			"systemPrompt": ambientConfig.SystemPrompt,
+			"artifactsDir": ambientConfig.ArtifactsDir,
+		},
 	})
 }
 
@@ -718,21 +599,12 @@ func parseFrontmatter(filePath string) map[string]string {
 	return result
 }
 
-// RubricConfig represents the rubric evaluation configuration in ambient.json.
-// Schema is a JSON Schema object that defines the tool's input_schema for
-// additional metadata fields beyond final_score and reasoning.
-type RubricConfig struct {
-	ActivationPrompt string                 `json:"activationPrompt,omitempty"`
-	Schema           map[string]interface{} `json:"schema,omitempty"`
-}
-
 // AmbientConfig represents the ambient.json configuration
 type AmbientConfig struct {
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	SystemPrompt string        `json:"systemPrompt"`
-	ArtifactsDir string        `json:"artifactsDir"`
-	Rubric       *RubricConfig `json:"rubric,omitempty"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	SystemPrompt string `json:"systemPrompt"`
+	ArtifactsDir string `json:"artifactsDir"`
 }
 
 // parseAmbientConfig reads and parses ambient.json from workflow directory
@@ -770,9 +642,9 @@ func parseAmbientConfig(workflowDir string) *AmbientConfig {
 
 // findActiveWorkflowDir finds the active workflow directory for a session
 func findActiveWorkflowDir(sessionName string) string {
-	// Workflows are stored at {StateBaseDir}/workflows/{workflow-name}
-	// The runner clones workflows to /workspace/workflows/ at runtime
-	workflowsBase := filepath.Join(StateBaseDir, "workflows")
+	// Workflows are stored at {StateBaseDir}/sessions/{session-name}/workspace/workflows/{workflow-name}
+	// The runner creates this nested structure
+	workflowsBase := filepath.Join(StateBaseDir, "sessions", sessionName, "workspace", "workflows")
 
 	entries, err := os.ReadDir(workflowsBase)
 	if err != nil {
@@ -798,9 +670,7 @@ func ContentGitMergeStatus(c *gin.Context) {
 	path := filepath.Clean("/" + strings.TrimSpace(c.Query("path")))
 	branch := strings.TrimSpace(c.Query("branch"))
 
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
@@ -808,6 +678,8 @@ func ContentGitMergeStatus(c *gin.Context) {
 	if branch == "" {
 		branch = "main"
 	}
+
+	abs := filepath.Join(StateBaseDir, path)
 
 	// Check if git repo exists
 	gitDir := filepath.Join(abs, ".git")
@@ -822,18 +694,10 @@ func ContentGitMergeStatus(c *gin.Context) {
 		return
 	}
 
-	// Get remote URL to determine which token to use
-	// Proceed without token if no remote configured - merge status check is read-only and may
-	// be called before remote is configured (e.g., for local-only repositories)
-	var gitToken string
-	if remoteURL, err := GetRemoteURL(c.Request.Context(), abs); err == nil {
-		gitToken = getGitTokenForURL(c, remoteURL)
-	}
-
-	status, err := GitCheckMergeStatus(c.Request.Context(), abs, branch, gitToken)
+	status, err := GitCheckMergeStatus(c.Request.Context(), abs, branch)
 	if err != nil {
 		log.Printf("ContentGitMergeStatus: check failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -854,9 +718,7 @@ func ContentGitPull(c *gin.Context) {
 	}
 
 	path := filepath.Clean("/" + body.Path)
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
@@ -865,16 +727,9 @@ func ContentGitPull(c *gin.Context) {
 		body.Branch = "main"
 	}
 
-	// Get remote URL to determine which token to use
-	remoteURL, err := GetRemoteURL(c.Request.Context(), abs)
-	if err != nil {
-		log.Printf("ContentGitPull: failed to get remote URL for %s: %v", abs, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no remote configured"})
-		return
-	}
+	abs := filepath.Join(StateBaseDir, path)
 
-	gitToken := getGitTokenForURL(c, remoteURL)
-	if err := GitPullRepo(c.Request.Context(), abs, body.Branch, gitToken); err != nil {
+	if err := GitPullRepo(c.Request.Context(), abs, body.Branch); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -898,9 +753,7 @@ func ContentGitPushToBranch(c *gin.Context) {
 	}
 
 	path := filepath.Clean("/" + body.Path)
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
@@ -913,16 +766,9 @@ func ContentGitPushToBranch(c *gin.Context) {
 		body.Message = "Session artifacts update"
 	}
 
-	// Get remote URL to determine which token to use
-	remoteURL, err := GetRemoteURL(c.Request.Context(), abs)
-	if err != nil {
-		log.Printf("ContentGitPushToBranch: failed to get remote URL for %s: %v", abs, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no remote configured"})
-		return
-	}
+	abs := filepath.Join(StateBaseDir, path)
 
-	gitToken := getGitTokenForURL(c, remoteURL)
-	if err := GitPushToRepo(c.Request.Context(), abs, body.Branch, body.Message, gitToken); err != nil {
+	if err := GitPushToRepo(c.Request.Context(), abs, body.Branch, body.Message); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -945,9 +791,7 @@ func ContentGitCreateBranch(c *gin.Context) {
 	}
 
 	path := filepath.Clean("/" + body.Path)
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
@@ -956,6 +800,8 @@ func ContentGitCreateBranch(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "branchName is required"})
 		return
 	}
+
+	abs := filepath.Join(StateBaseDir, path)
 
 	if err := GitCreateBranch(c.Request.Context(), abs, body.BranchName); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -970,60 +816,18 @@ func ContentGitCreateBranch(c *gin.Context) {
 func ContentGitListBranches(c *gin.Context) {
 	path := filepath.Clean("/" + strings.TrimSpace(c.Query("path")))
 
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
+	if path == "/" || strings.Contains(path, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
 		return
 	}
 
+	abs := filepath.Join(StateBaseDir, path)
+
 	branches, err := GitListRemoteBranches(c.Request.Context(), abs)
 	if err != nil {
-		// Log actual error for debugging, but return generic message to avoid leaking internal details
-		log.Printf("Internal server error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"branches": branches})
-}
-
-// ContentDelete handles DELETE /content/delete when running in CONTENT_SERVICE_MODE
-func ContentDelete(c *gin.Context) {
-	var req struct {
-		Path string `json:"path"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("ContentDelete: bind JSON failed: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	log.Printf("ContentDelete: path=%q StateBaseDir=%q", req.Path, StateBaseDir)
-
-	path := filepath.Clean("/" + strings.TrimSpace(req.Path))
-	abs := filepath.Join(StateBaseDir, path)
-	// Verify abs is within StateBaseDir to prevent path traversal
-	if !pathutil.IsPathWithinBase(abs, StateBaseDir) {
-		log.Printf("ContentDelete: path traversal attempt rejected: path=%q abs=%q", path, abs)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
-		return
-	}
-	log.Printf("ContentDelete: absolute path=%q", abs)
-
-	// Check if file exists
-	if _, err := os.Stat(abs); os.IsNotExist(err) {
-		log.Printf("ContentDelete: file not found: %q", abs)
-		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
-		return
-	}
-
-	// Delete the file
-	if err := os.Remove(abs); err != nil {
-		log.Printf("ContentDelete: delete failed for %q: %v", abs, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete file"})
-		return
-	}
-
-	log.Printf("ContentDelete: successfully deleted %q", abs)
-	c.JSON(http.StatusOK, gin.H{"message": "file deleted successfully"})
 }

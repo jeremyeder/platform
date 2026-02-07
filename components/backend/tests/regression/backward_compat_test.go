@@ -41,12 +41,12 @@ func TestBackwardCompatibility_ProviderDetection(t *testing.T) {
 		// New GitLab URLs should be detected
 		{
 			name:     "GitLab HTTPS",
-			url:      "https://gitlab.com/owner/repo",
+			url:      "https://gitlab.com/owner/repo.git",
 			expected: types.ProviderGitLab,
 		},
 		{
 			name:     "GitLab SSH",
-			url:      "git@gitlab.com:owner/repo",
+			url:      "git@gitlab.com:owner/repo.git",
 			expected: types.ProviderGitLab,
 		},
 	}

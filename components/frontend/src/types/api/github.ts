@@ -9,14 +9,6 @@ export type GitHubStatus = {
   userId?: string;
   host?: string;
   updatedAt?: string;
-  // PAT status
-  pat?: {
-    configured: boolean;
-    updatedAt?: string;
-    valid?: boolean;
-  };
-  // Active method: 'app' | 'pat'
-  active?: string;
   // Legacy OAuth fields (deprecated)
   connected?: boolean;
   username?: string;

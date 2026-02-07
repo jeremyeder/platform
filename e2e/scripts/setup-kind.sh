@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "======================================"
-echo "Setting up kind cluster for Ambient"
+echo "Setting up kind cluster for vTeam E2E"
 echo "======================================"
 
 # Detect container runtime (prefer explicit CONTAINER_ENGINE, then Docker, then Podman)
@@ -38,14 +38,14 @@ if [ "$CONTAINER_ENGINE" = "podman" ]; then
 fi
 
 # Check if kind cluster already exists
-if kind get clusters 2>/dev/null | grep -q "^ambient-local$"; then
-  echo "⚠️  Kind cluster 'ambient-local' already exists"
+if kind get clusters 2>/dev/null | grep -q "^vteam-e2e$"; then
+  echo "⚠️  Kind cluster 'vteam-e2e' already exists"
   echo "   Run './scripts/cleanup.sh' first to remove it"
   exit 1
 fi
 
 echo ""
-echo "Creating kind cluster..."
+echo "Creating kind cluster with ingress support..."
 
 # Use higher ports for Podman rootless compatibility (ports >= 1024)
 if [ "$CONTAINER_ENGINE" = "podman" ]; then
@@ -55,33 +55,94 @@ if [ "$CONTAINER_ENGINE" = "podman" ]; then
 else
   HTTP_PORT=80
   HTTPS_PORT=443
-  echo "   ℹ️  Using ports 80/443 (Docker standard ports)"
 fi
 
-cat <<EOF | kind create cluster --name ambient-local --config=-
+cat <<EOF | kind create cluster --name vteam-e2e --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
-  # Kind v0.31.0 default node image
-  image: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
   extraPortMappings:
-  - containerPort: 30080
+  - containerPort: 80
     hostPort: ${HTTP_PORT}
     protocol: TCP
-  - containerPort: 30443
+  - containerPort: 443
     hostPort: ${HTTPS_PORT}
     protocol: TCP
 EOF
 
 echo ""
-echo "✅ Kind cluster ready!"
-echo "   Cluster: ambient-local"
-echo "   Kubernetes: v1.35.0"
-echo "   NodePort: 30080 → host port ${HTTP_PORT}"
+echo "Installing nginx-ingress controller..."
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
 echo ""
-echo "📝 Next steps:"
-echo "   1. Deploy the platform: make kind-up (continues deployment)"
-echo "   2. Access services: make kind-port-forward (in another terminal)"
-echo "   3. Frontend: http://localhost:${HTTP_PORT}"
+echo "Waiting for ingress controller to be ready..."
+
+# Wait for deployment to exist first
+echo "   Waiting for deployment to be created..."
+for i in {1..30}; do
+  if kubectl get deployment ingress-nginx-controller -n ingress-nginx &>/dev/null; then
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    echo "❌ Timeout waiting for ingress controller deployment"
+    exit 1
+  fi
+  sleep 2
+done
+
+# Wait for pods to be created
+echo "   Waiting for pods to be created..."
+for i in {1..30}; do
+  if kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller &>/dev/null; then
+    POD_COUNT=$(kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller --no-headers 2>/dev/null | wc -l)
+    if [ "$POD_COUNT" -gt 0 ]; then
+      break
+    fi
+  fi
+  if [ $i -eq 30 ]; then
+    echo "❌ Timeout waiting for ingress controller pods"
+    exit 1
+  fi
+  sleep 2
+done
+
+# Now wait for pods to be ready
+echo "   Waiting for pods to be ready..."
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+
+echo ""
+echo "Adding vteam.local to /etc/hosts..."
+if grep -q "vteam.local" /etc/hosts 2>/dev/null; then
+  echo "   vteam.local already in /etc/hosts"
+else
+  # In CI, sudo typically doesn't require password (NOPASSWD configured)
+  # Locally, user will be prompted for password
+  if echo "127.0.0.1 vteam.local" | sudo tee -a /etc/hosts > /dev/null 2>&1; then
+    echo "   ✓ Added vteam.local to /etc/hosts"
+  else
+    echo "   ⚠️  Warning: Could not modify /etc/hosts (permission denied)"
+    echo "   Tests may fail if DNS resolution doesn't work"
+    echo "   Manual fix: Add '127.0.0.1 vteam.local' to /etc/hosts"
+  fi
+fi
+
+echo ""
+echo "✅ Kind cluster ready!"
+echo "   Cluster: vteam-e2e"
+echo "   Ingress: nginx"
+if [ "$CONTAINER_ENGINE" = "podman" ]; then
+  echo "   Access: http://vteam.local:8080"
+else
+  echo "   Access: http://vteam.local"
+fi
 

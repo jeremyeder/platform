@@ -9,17 +9,8 @@ spec:
       containers:
       - name: frontend
         env:
-        # Backend API URL for server-side Next.js API routes
-        - name: BACKEND_URL
-          value: "http://backend-service.ambient-code.svc.cluster.local:8080/api"
-        # E2E testing: provide token for both server-side and client-side
+        # E2E testing: provide token for Next.js API routes
         - name: OC_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: test-user-token
-              key: token
-        # NEXT_PUBLIC_ vars are exposed to client-side code
-        - name: NEXT_PUBLIC_E2E_TOKEN
           valueFrom:
             secretKeyRef:
               name: test-user-token

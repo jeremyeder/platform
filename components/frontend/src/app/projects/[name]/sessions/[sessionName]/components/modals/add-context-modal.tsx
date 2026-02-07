@@ -1,56 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Info, Upload } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 
 type AddContextModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddRepository: (url: string, branch: string, autoPush?: boolean) => Promise<void>;
-  onUploadFile?: () => void;
+  onAddRepository: (url: string, branch: string) => Promise<void>;
   isLoading?: boolean;
-  autoBranch?: string;   // Auto-generated branch from backend (single source of truth)
 };
 
 export function AddContextModal({
   open,
   onOpenChange,
   onAddRepository,
-  onUploadFile,
   isLoading = false,
-  autoBranch,
 }: AddContextModalProps) {
   const [contextUrl, setContextUrl] = useState("");
-  const [contextBranch, setContextBranch] = useState("");  // Empty = use auto-generated branch
-  const [autoPush, setAutoPush] = useState(false);
+  const [contextBranch, setContextBranch] = useState("main");
 
   const handleSubmit = async () => {
     if (!contextUrl.trim()) return;
-
-    // Trim URL and remove trailing slash
-    const sanitizedUrl = contextUrl.trim().replace(/\/+$/, '');
-
-    // Use autoBranch from backend (single source of truth), or empty to let runner auto-generate
-    const defaultBranch = autoBranch || '';
-    await onAddRepository(sanitizedUrl, contextBranch.trim() || defaultBranch, autoPush);
-
+    
+    await onAddRepository(contextUrl.trim(), contextBranch.trim() || 'main');
+    
     // Reset form
     setContextUrl("");
-    setContextBranch("");
-    setAutoPush(false);
+    setContextBranch("main");
   };
 
   const handleCancel = () => {
     setContextUrl("");
-    setContextBranch("");
-    setAutoPush(false);
+    setContextBranch("main");
     onOpenChange(false);
   };
 
@@ -89,60 +75,14 @@ export function AddContextModal({
             <Label htmlFor="context-branch">Branch (optional)</Label>
             <Input
               id="context-branch"
-              // Use autoBranch from backend (single source of truth)
-              placeholder={autoBranch}
+              placeholder="main"
               value={contextBranch}
               onChange={(e) => setContextBranch(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              If left empty, a unique feature branch will be created for this session
+              Leave empty to use the default branch
             </p>
           </div>
-
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id="auto-push"
-              checked={autoPush}
-              onCheckedChange={(checked) => setAutoPush(checked === true)}
-            />
-            <div className="space-y-1">
-              <Label
-                htmlFor="auto-push"
-                className="text-sm font-normal cursor-pointer"
-              >
-                Enable auto-push
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Instructs Claude to commit and push changes made to this
-                repository during the session. Requires git credentials to be
-                configured.
-              </p>
-            </div>
-          </div>
-
-          {onUploadFile && (
-            <>
-              <Separator className="my-4" />
-              <div className="space-y-2">
-                <Label>Upload Files</Label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Upload files directly to your workspace for use as context
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    onUploadFile();
-                    onOpenChange(false);
-                  }}
-                  className="w-full"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Files
-                </Button>
-              </div>
-            </>
-          )}
         </div>
 
         <DialogFooter>

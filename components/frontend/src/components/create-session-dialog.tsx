@@ -4,8 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -19,12 +18,12 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -32,21 +31,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import type { CreateAgenticSessionRequest } from "@/types/agentic-session";
 import { useCreateSession } from "@/services/queries/use-sessions";
-import { useIntegrationsStatus } from "@/services/queries/use-integrations";
-import { errorToast } from "@/hooks/use-toast";
+import { successToast, errorToast } from "@/hooks/use-toast";
 
 const models = [
   { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-  { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
   { value: "claude-opus-4-5", label: "Claude Opus 4.5" },
   { value: "claude-opus-4-1", label: "Claude Opus 4.1" },
   { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
 ];
 
 const formSchema = z.object({
-  displayName: z.string().max(50).optional(),
   model: z.string().min(1, "Please select a model"),
   temperature: z.number().min(0).max(2),
   maxTokens: z.number().min(100).max(8000),
@@ -70,17 +68,9 @@ export function CreateSessionDialog({
   const router = useRouter();
   const createSessionMutation = useCreateSession();
 
-  const { data: integrationsStatus } = useIntegrationsStatus();
-
-  const githubConfigured = integrationsStatus?.github?.active != null;
-  const gitlabConfigured = integrationsStatus?.gitlab?.connected ?? false;
-  const atlassianConfigured = integrationsStatus?.jira?.connected ?? false;
-  const googleConfigured = integrationsStatus?.google?.connected ?? false;
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      displayName: "",
       model: "claude-sonnet-4-5",
       temperature: 0.7,
       maxTokens: 4000,
@@ -93,6 +83,7 @@ export function CreateSessionDialog({
 
     const request: CreateAgenticSessionRequest = {
       interactive: true,
+      initialPrompt: "Greet the user and briefly explain the workspace capabilities: they can select workflows, add code repositories for context, use slash commands, and you'll help with software engineering tasks. Keep it friendly and concise.",
       llmSettings: {
         model: values.model,
         temperature: values.temperature,
@@ -100,16 +91,13 @@ export function CreateSessionDialog({
       },
       timeout: values.timeout,
     };
-    const trimmedName = values.displayName?.trim();
-    if (trimmedName) {
-      request.displayName = trimmedName;
-    }
 
     createSessionMutation.mutate(
       { projectName, data: request },
       {
         onSuccess: (session) => {
           const sessionName = session.metadata.name;
+          successToast(`Session "${sessionName}" created successfully`);
           setOpen(false);
           form.reset();
           router.push(`/projects/${encodeURIComponent(projectName)}/sessions/${sessionName}`);
@@ -144,29 +132,6 @@ export function CreateSessionDialog({
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Session name (optional; same as Edit name in kebab menu) */}
-              <FormField
-                control={form.control}
-                name="displayName"
-                render={({ field }) => (
-                  <FormItem className="w-full">
-                    <FormLabel>Session name</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Enter a display name..."
-                        maxLength={50}
-                        disabled={createSessionMutation.isPending}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">
-                      {(field.value ?? "").length}/50 characters. Optional; you can rename later from the session menu.
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {/* Model Selection */}
               <FormField
                 control={form.control}
@@ -193,141 +158,88 @@ export function CreateSessionDialog({
                 )}
               />
 
-              {/* Integration auth status */}
-              <div className="w-full space-y-2">
-                <FormLabel>Integrations</FormLabel>
-                {/* GitHub card */}
-                {githubConfigured ? (
-                  <div className="flex items-start justify-between gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        </div>
-                        <h4 className="font-medium text-sm">GitHub</h4>
+              {/* Advanced Settings Accordion */}
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="advanced-settings" className="border rounded-md">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <span className="text-sm font-medium">Change Default Model Settings</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    <div className="space-y-6 pt-4">
+                      {/* Temperature and Timeout */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="temperature"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Temperature</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="2"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormDescription>Controls randomness (0.0 - 2.0)</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="timeout"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Timeout (seconds)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="60"
+                                  min="60"
+                                  max="1800"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormDescription>Session timeout (60-1800 seconds)</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Authenticated. Git push and repository access enabled.
-                      </p>
+
+                      {/* Max Output Tokens */}
+                      <FormField
+                        control={form.control}
+                        name="maxTokens"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max Output Tokens</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="100"
+                                min="100"
+                                max="8000"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormDescription>Maximum response length (100-8000)</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-shrink-0">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">GitHub</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Not connected.{" "}
-                        <Link href="/integrations" className="text-primary hover:underline">
-                          Set up
-                        </Link>{" "}
-                        to enable repository access.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {/* GitLab card */}
-                {gitlabConfigured ? (
-                  <div className="flex items-start justify-between gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        </div>
-                        <h4 className="font-medium text-sm">GitLab</h4>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Authenticated. Git push and repository access enabled.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-shrink-0">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">GitLab</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Not connected.{" "}
-                        <Link href="/integrations" className="text-primary hover:underline">
-                          Set up
-                        </Link>{" "}
-                        to enable repository access.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {/* Google Workspace card */}
-                {googleConfigured ? (
-                  <div className="flex items-start justify-between gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        </div>
-                        <h4 className="font-medium text-sm">Google Workspace</h4>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Authenticated. Drive, Calendar, and Gmail access enabled.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-shrink-0">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">Google Workspace</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Not connected.{" "}
-                        <Link href="/integrations" className="text-primary hover:underline">
-                          Set up
-                        </Link>{" "}
-                        to enable Drive, Calendar, and Gmail access.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {/* Jira card */}
-                {atlassianConfigured ? (
-                  <div className="flex items-start justify-between gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        </div>
-                        <h4 className="font-medium text-sm">Jira</h4>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Authenticated. Issue and project access enabled.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-3 p-3 border rounded-lg bg-background/50">
-                    <div className="flex-shrink-0">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">Jira</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Not connected.{" "}
-                        <Link
-                          href="/integrations"
-                          className="text-primary hover:underline"
-                        >
-                          Set up
-                        </Link>{" "}
-                        to enable issue and project access.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
 
               <DialogFooter>
                 <Button
@@ -352,3 +264,4 @@ export function CreateSessionDialog({
     </>
   );
 }
+

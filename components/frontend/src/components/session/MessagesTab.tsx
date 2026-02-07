@@ -3,9 +3,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MessageSquare, Loader2, Settings, Terminal, Users } from "lucide-react";
 import { StreamMessage } from "@/components/ui/stream-message";
-import { LoadingDots } from "@/components/ui/message";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AgenticSession, MessageObject, ToolUseMessages } from "@/types/agentic-session";
 import type { WorkflowMetadata } from "@/app/projects/[name]/sessions/[sessionName]/lib/types";
-import type { QueuedMessageItem } from "@/hooks/use-session-queue";
 
 export type MessagesTabProps = {
   session: AgenticSession;
@@ -24,27 +23,21 @@ export type MessagesTabProps = {
   setChatInput: (v: string) => void;
   onSendChat: () => Promise<void>;
   onInterrupt: () => Promise<void>;
+  onEndSession: () => Promise<void>;
   onGoToResults?: () => void;
   onContinue: () => void;
   workflowMetadata?: WorkflowMetadata;
   onCommandClick?: (slashCommand: string) => void;
-  isRunActive?: boolean;  // Track if agent is actively processing
-  showWelcomeExperience?: boolean;
-  welcomeExperienceComponent?: React.ReactNode;
-  activeWorkflow?: string | null;  // Track if workflow has been selected
-  userHasInteracted?: boolean;  // Track if user has sent any messages
-  queuedMessages?: QueuedMessageItem[];  // Messages queued while session wasn't running
-  hasRealMessages?: boolean;  // Track if there are real user/agent messages
 };
 
 
-const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chatInput, setChatInput, onSendChat, onInterrupt, onGoToResults, onContinue, workflowMetadata, onCommandClick, isRunActive = false, showWelcomeExperience, welcomeExperienceComponent, activeWorkflow, userHasInteracted = false, queuedMessages = [], hasRealMessages = false }) => {
-  const [interrupting, setInterrupting] = useState(false);
+const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chatInput, setChatInput, onSendChat, onInterrupt, onEndSession, onGoToResults, onContinue, workflowMetadata, onCommandClick }) => {
   const [sendingChat, setSendingChat] = useState(false);
+  const [interrupting, setInterrupting] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [showSystemMessages, setShowSystemMessages] = useState(false);
   const [agentsPopoverOpen, setAgentsPopoverOpen] = useState(false);
   const [commandsPopoverOpen, setCommandsPopoverOpen] = useState(false);
-  const [waitingDotCount, setWaitingDotCount] = useState(0);
   
   // Autocomplete state
   const [autocompleteOpen, setAutocompleteOpen] = useState(false);
@@ -61,8 +54,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
   const phase = session?.status?.phase || "";
   const isInteractive = session?.spec?.interactive;
   
-  // Show chat interface only when session is interactive AND Running
-  // Welcome experience can be shown during Pending/Creating, but chat input only when Running
+  // Only show chat interface when session is interactive AND in Running state
   const showChatInterface = isInteractive && phase === "Running";
   
   // Determine if session is in a terminal state
@@ -118,18 +110,6 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
     scrollToBottom();
   }, []);
 
-  // Animate dots for "Please wait one moment" message
-  useEffect(() => {
-    const unsentCount = queuedMessages.filter(m => !m.sentAt).length;
-    if (unsentCount === 0) return;
-
-    const interval = setInterval(() => {
-      setWaitingDotCount((prev) => (prev + 1) % 4); // Cycles 0, 1, 2, 3
-    }, 500); // Change dot every 500ms
-
-    return () => clearInterval(interval);
-  }, [queuedMessages]);
-
   // Click outside to close autocomplete
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -165,6 +145,15 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
       await onInterrupt();
     } finally {
       setInterrupting(false);
+    }
+  };
+
+  const handleEndSession = async () => {
+    setEnding(true);
+    try {
+      await onEndSession();
+    } finally {
+      setEnding(false);
     }
   };
 
@@ -277,79 +266,31 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
     }
   };
 
-  // Determine if we should show messages
-  // Messages should be hidden until workflow is selected OR user sends a message when welcome experience is active
-  // BUT always show messages if there are real messages (e.g., when loading an existing session with messages)
-  const shouldShowMessages = !showWelcomeExperience || activeWorkflow || userHasInteracted || hasRealMessages;
-
   return (
     <div className="flex flex-col h-full">
       <div 
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 flex flex-col gap-2 overflow-y-auto p-3 scrollbar-thin"
+        className="flex-1 flex flex-col gap-2 overflow-y-auto px-3 pb-2 scrollbar-thin"
       >
-        {/* Show welcome experience if active - let the component handle its own visibility logic */}
-        {showWelcomeExperience && welcomeExperienceComponent}
-
-        {/* Show filtered messages only if workflow is selected or welcome experience is not shown */}
-        {shouldShowMessages && filteredMessages.map((m, idx) => (
+        {filteredMessages.map((m, idx) => (
           <StreamMessage key={`sm-${idx}`} message={m} isNewest={idx === filteredMessages.length - 1} onGoToResults={onGoToResults} />
         ))}
 
-        {/* Show queued messages as regular user messages (only if not yet sent) */}
-        {queuedMessages.length > 0 && queuedMessages.filter(m => !m.sentAt).map((item) => {
-          const queuedUserMessage: MessageObject = {
-            type: "user_message",
-            content: { type: "text_block", text: item.content },
-            timestamp: new Date(item.timestamp).toISOString(),
-          };
-          return (
-            <StreamMessage 
-              key={`queued-${item.id}`} 
-              message={queuedUserMessage} 
-              isNewest={false}
-              onGoToResults={onGoToResults}
-            />
-          );
-        })}
-
-        {/* Show "Please wait" message while queued messages are waiting */}
-        {queuedMessages.filter(m => !m.sentAt).length > 0 && (
-          <div className="mb-4 mt-2">
-            <div className="flex space-x-3 items-start">
-              {/* Avatar */}
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-600">
-                  <span className="text-white text-xs font-semibold">AI</span>
-                </div>
-              </div>
-
-              {/* Message Content */}
-              <div className="flex-1 min-w-0">
-                {/* Timestamp */}
-                <div className="text-[10px] text-muted-foreground/60 mb-1">just now</div>
-                <div className="rounded-lg bg-card">
-                  {/* Content */}
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-[0.2rem]">
-                    Please wait one moment{".".repeat(waitingDotCount)}
-                  </p>
-                </div>
-              </div>
-            </div>
+        {filteredMessages.length === 0 && isCreating && (
+          <div className="flex items-center justify-center py-12">
+            <Alert className="max-w-md mx-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertTitle>Starting Session...</AlertTitle>
+              <AlertDescription>
+                <p>Setting up your workspace and initializing the agent. Messages will appear here once the session is ready.</p>
+              </AlertDescription>
+            </Alert>
           </div>
         )}
 
-        {/* Show loading indicator when agent is actively processing */}
-        {shouldShowMessages && isRunActive && filteredMessages.length > 0 && (
-          <div className="pl-12 pr-4 py-2">
-            <LoadingDots />
-          </div>
-        )}
-
-        {/* Show empty state only if no welcome experience and no messages */}
-        {!showWelcomeExperience && filteredMessages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+        {filteredMessages.length === 0 && !isCreating && (
+          <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
             <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No messages yet</p>
             <p className="text-xs mt-1">
@@ -396,7 +337,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                 <textarea
                   ref={textareaRef}
                   className="w-full border rounded p-2 text-sm"
-                  placeholder={isRunActive ? "Agent is processing... (click Stop to interrupt)" : "Type a message to the agent... (Press Enter to send, Shift+Enter for new line)"}
+                  placeholder="Type a message to the agent... (Press Enter to send, Shift+Enter for new line)"
                   value={chatInput}
                   onChange={handleChatInputChange}
                   onKeyDown={(e) => {
@@ -437,7 +378,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                     }
                   }}
                   rows={3}
-                  disabled={sendingChat || isRunActive}
+                  disabled={sendingChat}
                 />
                 
                 {/* Autocomplete popup */}
@@ -481,6 +422,9 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                         );
                       } else {
                         const cmd = item as { id: string; name: string; slashCommand: string; description?: string };
+                        const commandTitle = cmd.name.includes('.') 
+                          ? cmd.name.split('.').pop() 
+                          : cmd.name;
                         
                         return (
                           <div
@@ -494,8 +438,8 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                             onMouseEnter={() => setAutocompleteSelectedIndex(index)}
                           >
                             <div className="font-medium text-sm">{cmd.slashCommand}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {cmd.name}
+                            <div className="text-xs text-muted-foreground truncate capitalize">
+                              {commandTitle}
                             </div>
                           </div>
                         );
@@ -622,14 +566,18 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                             className="max-h-[400px] overflow-y-scroll space-y-2 pr-2 scrollbar-thin"
                           >
                             {workflowMetadata.commands.map((cmd) => {
+                              const commandTitle = cmd.name.includes('.') 
+                                ? cmd.name.split('.').pop() 
+                                : cmd.name;
+                              
                               return (
                                 <div
                                   key={cmd.id}
                                   className="p-3 rounded-md border bg-muted/30"
                                 >
                                   <div className="flex items-center justify-between mb-1">
-                                    <h3 className="text-sm font-bold">
-                                      {cmd.name}
+                                    <h3 className="text-sm font-bold capitalize">
+                                      {commandTitle}
                                     </h3>
                                     <Button
                                       variant="outline"
@@ -642,7 +590,7 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                                         }
                                       }}
                                     >
-                                      Run {cmd.slashCommand}
+                                      Run {cmd.slashCommand.replace(/^\/speckit\./, '/')}
                                     </Button>
                                   </div>
                                   {cmd.description && (
@@ -660,55 +608,58 @@ const MessagesTab: React.FC<MessagesTabProps> = ({ session, streamMessages, chat
                   )}
                 </div>
                 <div className="flex gap-2">
-                  {/* Show Stop button when run is active, otherwise show Send */}
-                  {isRunActive ? (
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={handleInterrupt}
-                      disabled={interrupting}
-                    >
-                      {interrupting && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                      Stop
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={handleSendChat}
-                      disabled={!chatInput.trim() || sendingChat}
-                    >
-                      {sendingChat && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                      Send
-                    </Button>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleInterrupt}
+                    disabled={interrupting || sendingChat || ending}
+                  >
+                    {interrupting && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                    Interrupt agent
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={handleEndSession}
+                    disabled={ending || sendingChat || interrupting}
+                  >
+                    {ending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                    End session
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSendChat} 
+                    disabled={!chatInput.trim() || sendingChat || interrupting || ending}
+                  >
+                    {sendingChat && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                    Send
+                  </Button>
                 </div>
               </div>
           </div>
         </div>
       )}
 
-      {isInteractive && !showChatInterface && (streamMessages.length > 0 || isCreating || isTerminalState) && (
+      {isInteractive && !showChatInterface && streamMessages.length > 0 && (
         <div className="sticky bottom-0 border-t bg-muted/50">
           <div className="p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {streamMessages.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuCheckboxItem
-                        checked={showSystemMessages}
-                        onCheckedChange={setShowSystemMessages}
-                      >
-                        Show system messages
-                      </DropdownMenuCheckboxItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuCheckboxItem
+                      checked={showSystemMessages}
+                      onCheckedChange={setShowSystemMessages}
+                    >
+                      Show system messages
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <p className="text-sm text-muted-foreground">
                   {isCreating && "Chat will be available once the session is running..."}
                   {isTerminalState && (

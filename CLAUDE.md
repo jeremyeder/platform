@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **Ambient Code Platform** is a Kubernetes-native AI automation platform that orchestrates intelligent agentic sessions through containerized microservices. The platform enables AI-powered automation for analysis, research, development, and content creation tasks via a modern web interface.
 
-> **Note:** This project was formerly known as "vTeam". Technical artifacts (image names, namespaces, API groups, routes) still use "vteam" for backward compatibility. The docs use ACP naming.
+> **Note:** This project was formerly known as "vTeam". Technical artifacts (image names, namespaces, API groups) still use "vteam" for backward compatibility.
 
 ### Amber Background Agent
 
@@ -111,18 +111,7 @@ instead of service accounts for API operations."
 
 ### Quick Start - Local Development
 
-**Recommended: Kind (Kubernetes in Docker):**
-
-```bash
-# Prerequisites: Docker installed
-# Fast startup, matches CI environment
-make kind-up
-
-# Access at http://localhost:8080
-# Full guide: docs/developer/local-development/kind.md
-```
-
-**Alternative: OpenShift Local (CRC) - for OpenShift-specific features:**
+**Single command setup with OpenShift Local (CRC):**
 
 ```bash
 # Prerequisites: brew install crc
@@ -346,86 +335,6 @@ The Claude Code runner (`components/runners/claude-code-runner/`) provides:
 - **API version**: `v1alpha1` (current)
 - **RBAC**: Namespace-scoped service accounts with minimal permissions
 
-### Langfuse Observability (LLM Tracing)
-
-The platform includes optional Langfuse integration for LLM observability, tracking usage metrics while protecting user privacy.
-
-#### Privacy-First Design
-
-- **Default behavior**: User messages and assistant responses are **REDACTED** in traces
-- **Preserved data**: Usage metrics (tokens, costs), metadata (model, turn count, timestamps)
-- **Rationale**: Track costs and usage patterns without exposing potentially sensitive user data
-
-#### Configuration
-
-**Enable Langfuse** (disabled by default):
-```bash
-# In ambient-admin-langfuse-secret
-LANGFUSE_ENABLED=true
-LANGFUSE_PUBLIC_KEY=<your-key>
-LANGFUSE_SECRET_KEY=<your-secret>
-LANGFUSE_HOST=http://langfuse-web.langfuse.svc.cluster.local:3000
-```
-
-**Privacy Controls** (optional - masking enabled by default):
-```bash
-# Masking is ENABLED BY DEFAULT (no environment variable needed)
-# The runner defaults to LANGFUSE_MASK_MESSAGES=true if not set
-
-# To explicitly set (optional):
-LANGFUSE_MASK_MESSAGES=true
-
-# To disable masking (dev/testing ONLY - exposes full message content):
-LANGFUSE_MASK_MESSAGES=false
-```
-
-#### Deployment
-
-Deploy Langfuse to your cluster:
-```bash
-# Deploy with default privacy-preserving settings
-./e2e/scripts/deploy-langfuse.sh
-
-# For OpenShift
-./e2e/scripts/deploy-langfuse.sh --openshift
-
-# For Kubernetes
-./e2e/scripts/deploy-langfuse.sh --kubernetes
-```
-
-#### Implementation
-
-- **Location**: `components/runners/claude-code-runner/observability.py`
-- **Masking function**: `_privacy_masking_function()` - redacts content while preserving metrics
-- **Test coverage**: `tests/test_privacy_masking.py` - validates masking behavior
-
-#### What Gets Logged
-
-**With Masking Enabled (Default)**:
-- ✅ Token counts (input, output, cache read, cache creation)
-- ✅ Cost calculations (USD per session)
-- ✅ Model names and versions
-- ✅ Turn counts and session durations
-- ✅ Tool usage (names, execution status)
-- ✅ Error states and completion status
-- ❌ User prompts (redacted)
-- ❌ Assistant responses (redacted)
-- ❌ Tool outputs with long content (redacted)
-
-**With Masking Disabled** (dev/testing only):
-- ✅ All of the above
-- ⚠️ Full user message content (potentially sensitive!)
-- ⚠️ Full assistant response content
-- ⚠️ Complete tool outputs
-
-#### OpenTelemetry Support
-
-Langfuse supports OpenTelemetry as of 2025:
-- **Current implementation**: Langfuse Python SDK (v3, OTel-based)
-- **Alternative**: Pure OpenTelemetry SDK → Langfuse OTLP endpoint (`/api/public/otel`)
-- **Migration**: Not recommended unless vendor neutrality is required
-- **Benefit**: Current SDK already uses OTel underneath
-
 ## Backend and Operator Development Standards
 
 **IMPORTANT**: When working on backend (`components/backend/`) or operator (`components/operator/`) code, you MUST follow these strict guidelines based on established patterns in the codebase.
@@ -460,23 +369,6 @@ Langfuse supports OpenTelemetry as of 2025:
    - REQUIRED: Use `Controller: boolPtr(true)` for primary owner
    - FORBIDDEN: `BlockOwnerDeletion` (causes permission issues in multi-tenant environments)
    - Pattern: (operator/internal/handlers/sessions.go:125-134, handlers/sessions.go:470-476)
-
-### Exception: Public API Gateway Service
-
-The `components/public-api/` service is a **stateless HTTP gateway** that does NOT follow the standard backend patterns above. This is intentional:
-
-- **No K8s Clients**: The public-api does NOT use `GetK8sClientsForRequest()` or access Kubernetes directly
-- **No RBAC Permissions**: The ServiceAccount has NO RoleBindings - it cannot access any K8s resources
-- **Token Forwarding Only**: All requests are proxied to the backend with the user's token in the `Authorization` header
-- **Backend Validates**: All K8s operations and RBAC enforcement happen in the backend service
-
-**Why different?** The public-api is a thin shim layer that:
-1. Extracts and validates tokens
-2. Extracts project context (from header or ServiceAccount token)
-3. Validates input parameters (prevents injection attacks)
-4. Forwards requests with proper authorization headers
-
-This separation of concerns improves security by minimizing the attack surface of the externally-exposed service.
 
 ### Package Organization
 
@@ -995,70 +887,72 @@ Study these files to understand established patterns:
 
 ## Testing Strategy
 
-### E2E Tests (Cypress - Portable)
+### E2E Tests (Cypress + Kind)
 
-**Purpose**: Automated end-to-end testing of the Ambient Code Platform against any deployed instance.
+**Purpose**: Automated end-to-end testing of the complete vTeam stack in a Kubernetes environment.
 
 **Location**: `e2e/`
 
 **Quick Start**:
 
 ```bash
-# Test against local kind cluster
-make test-e2e-local
-
-# Test against external cluster
-export CYPRESS_BASE_URL=https://your-frontend.com
-export TEST_TOKEN=$(oc whoami -t)
-cd e2e && npm test
+make e2e-test CONTAINER_ENGINE=podman  # Or docker
 ```
-
-**Test Suites**:
-
-- **vteam.cy.ts** (5 tests): Platform smoke tests — auth, workspace CRUD, API connectivity
-- **sessions.cy.ts** (7 tests): Session management — creation, UI, workflows, agent interaction
-
-**Total Runtime**: ~15 seconds (12 tests consolidated from original 29)
 
 **What Gets Tested**:
 
-- ✅ Workspace creation and navigation
-- ✅ Session creation and UI components
-- ✅ Workflow selection and cards
-- ✅ Chat interface availability
-- ✅ Breadcrumb navigation
-- ✅ Backend API endpoints
-- ✅ Real agent interaction (with ANTHROPIC_API_KEY)
+- ✅ Full vTeam deployment in kind (Kubernetes in Docker)
+- ✅ Frontend UI rendering and navigation
+- ✅ Backend API connectivity
+- ✅ Project creation workflow (main user journey)
+- ✅ Authentication with ServiceAccount tokens
+- ✅ Ingress routing
+- ✅ All pods deploy and become ready
 
 **What Doesn't Get Tested**:
 
-- ❌ OAuth proxy flow (uses direct token auth)
-- ❌ OpenShift Routes (uses Ingress for kind)
-- ❌ Long-running agent workflows (timeout constraints)
-- ❌ Multi-user concurrent sessions
+- ❌ OAuth proxy flow (uses direct token auth for simplicity)
+- ❌ Session pod execution (requires Anthropic API key)
+- ❌ Multi-user scenarios
 
-**CI Integration**: Tests run automatically on all PRs via GitHub Actions (`.github/workflows/e2e.yml`) using kind + Quay.io images.
+**Test Suite** (`e2e/cypress/e2e/vteam.cy.ts`):
 
-**Local Development**:
+1. UI loads with token authentication
+2. Navigate to new project page
+3. Create a new project
+4. List created projects
+5. Backend API cluster-info endpoint
 
-```bash
-# Kind with production images (Quay.io)
-make kind-up        # Setup
-make test-e2e       # Test
-make kind-down      # Cleanup
+**CI Integration**: Tests run automatically on all PRs via GitHub Actions (`.github/workflows/e2e.yml`)
+
+**Key Implementation Details**:
+
+- **Architecture**: Frontend without oauth-proxy, direct token injection via environment variables
+- **Authentication**: Test user ServiceAccount with cluster-admin permissions
+- **Token Handling**: Frontend deployment includes `OC_TOKEN`, `OC_USER`, `OC_EMAIL` env vars
+- **Podman Support**: Auto-detects runtime, uses ports 8080/8443 for rootless Podman
+- **Ingress**: Standard nginx-ingress with path-based routing
+
+**Adding New Tests**:
+
+```typescript
+it('should test new feature', () => {
+  cy.visit('/some-page')
+  cy.contains('Expected Content').should('be.visible')
+  cy.get('#button').click()
+  // Auth header automatically injected via beforeEach interceptor
+})
 ```
 
-**Key Features**:
+**Debugging Tests**:
 
-- **Portable**: Tests run against any cluster (kind, CRC, dev, prod)
-- **Fast**: 15-second runtime, one workspace reused across tests
-- **Consolidated**: User journey tests, not isolated element checks
-- **Real Agent Testing**: Verifies actual Claude responses (not hardcoded messages)
+```bash
+cd e2e
+source .env.test
+CYPRESS_TEST_TOKEN="$TEST_TOKEN" CYPRESS_BASE_URL="http://vteam.local:8080" npm run test:headed
+```
 
-**Documentation**: 
-- [E2E Testing README](e2e/README.md) - Running tests
-- [Kind Local Dev Guide](docs/developer/local-development/kind.md) - Using kind for development
-- [E2E Testing Guide](docs/testing/e2e-guide.md) - Writing tests
+**Documentation**: See `e2e/README.md` and `docs/testing/e2e-guide.md` for comprehensive testing guide.
 
 ### Backend Tests (Go)
 
@@ -1113,7 +1007,7 @@ Special lab track for leadership training located in `docs/labs/director-trainin
 
 - **API keys**: Store in Kubernetes Secrets, managed via ProjectSettings CR
 - **RBAC**: Namespace-scoped isolation prevents cross-project access
-- **OAuth integration**: OpenShift OAuth for cluster-based authentication (see `docs/deployment/OPENSHIFT_OAUTH.md`)
+- **OAuth integration**: OpenShift OAuth for cluster-based authentication (see `docs/OPENSHIFT_OAUTH.md`)
 - **Network policies**: Component isolation and secure communication
 
 ### Monitoring

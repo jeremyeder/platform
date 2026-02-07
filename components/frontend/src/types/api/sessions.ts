@@ -38,7 +38,6 @@ export type LLMSettings = {
 export type SessionRepo = {
   url: string;
   branch?: string;
-  autoPush?: boolean;
 };
 
 export type AgenticSessionSpec = {
@@ -59,11 +58,8 @@ export type AgenticSessionSpec = {
 
 export type ReconciledRepo = {
   url: string;
-  branch: string; // DEPRECATED: Use currentActiveBranch instead
+  branch: string;
   name?: string;
-  branches?: string[]; // All local branches available
-  currentActiveBranch?: string; // Currently checked out branch
-  defaultBranch?: string; // Default branch of remote
   status?: 'Cloning' | 'Ready' | 'Failed';
   clonedAt?: string;
 };
@@ -109,9 +105,6 @@ export type AgenticSession = {
   };
   spec: AgenticSessionSpec;
   status?: AgenticSessionStatus;
-  // Computed field from backend - auto-generated branch name
-  // IMPORTANT: Keep in sync with backend (sessions.go) and runner (main.py)
-  autoBranch?: string;
 };
 
 export type CreateAgenticSessionRequest = {
@@ -124,6 +117,7 @@ export type CreateAgenticSessionRequest = {
   environmentVariables?: Record<string, string>;
   interactive?: boolean;
   repos?: SessionRepo[];
+  autoPushOnComplete?: boolean;
   userContext?: UserContext;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
@@ -133,7 +127,6 @@ export type CreateAgenticSessionResponse = {
   message: string;
   name: string;
   uid: string;
-  autoBranch: string;  // Auto-generated branch name (e.g., "ambient/1234567890")
 };
 
 export type GetAgenticSessionResponse = {

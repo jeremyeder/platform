@@ -1,14 +1,4 @@
-describe('Ambient Platform E2E Tests', () => {
-  // Handle React hydration errors gracefully
-  Cypress.on('uncaught:exception', (err) => {
-    if (err.message.includes('Minified React error #418') ||
-        err.message.includes('Minified React error #423') ||
-        err.message.includes('Hydration')) {
-      return false
-    }
-    return true
-  })
-
+describe('vTeam E2E Tests', () => {
   before(() => {
     // Verify auth token is available
     const token = Cypress.env('TEST_TOKEN')

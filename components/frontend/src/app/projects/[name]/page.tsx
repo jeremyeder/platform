@@ -80,7 +80,7 @@ export default function ProjectDetailsPage() {
         <div className="px-6 pt-6 pb-4">
           <PageHeader
             title={project?.displayName || projectName}
-            description={project?.description || 'Manage agentic sessions, configure settings, and control access for this workspace'}
+            description={project?.description || 'Workspace details and configuration'}
           />
         </div>
 

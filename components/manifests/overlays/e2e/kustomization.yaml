@@ -9,9 +9,8 @@ resources:
 - secrets.yaml
 - test-user.yaml
 - frontend-ingress.yaml
-# backend-ingress removed - all traffic goes through frontend (Next.js proxies to backend)
+- backend-ingress.yaml
 - operator-config.yaml
-- minio-credentials.yaml
 
 # Patches for e2e environment
 patches:
@@ -23,18 +22,10 @@ patches:
   target:
     kind: PersistentVolumeClaim
     name: backend-state-pvc
-- path: minio-pvc-patch.yaml
-  target:
-    kind: PersistentVolumeClaim
-    name: minio-data
 - path: frontend-test-patch.yaml
   target:
     kind: Deployment
     name: frontend
-- path: operator-env-patch.yaml
-  target:
-    kind: Deployment
-    name: agentic-operator
 
 # JSON patches to set imagePullPolicy for all deployments
 patchesJson6902:
@@ -57,16 +48,18 @@ patchesJson6902:
     name: agentic-operator
   path: image-pull-policy-patch.yaml
 
-# E2E images - use local builds (all components)
-# Runner image is controlled by AMBIENT_CODE_RUNNER_IMAGE in operator-env-patch
+# E2E images (same as production, but can be overridden for local testing)
 images:
 - name: quay.io/ambient_code/vteam_backend
-  newName: vteam_backend
+  newName: quay.io/ambient_code/vteam_backend
   newTag: latest
 - name: quay.io/ambient_code/vteam_frontend
-  newName: vteam_frontend
+  newName: quay.io/ambient_code/vteam_frontend
   newTag: latest
 - name: quay.io/ambient_code/vteam_operator
-  newName: vteam_operator
+  newName: quay.io/ambient_code/vteam_operator
+  newTag: latest
+- name: quay.io/ambient_code/vteam_claude_runner
+  newName: quay.io/ambient_code/vteam_claude_runner
   newTag: latest
 

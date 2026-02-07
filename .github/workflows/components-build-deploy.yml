@@ -10,7 +10,6 @@ on:
       - 'components/operator/**'
       - 'components/backend/**'
       - 'components/frontend/**'
-      - 'components/public-api/**'
   pull_request_target:
     branches: [main]
     paths:
@@ -20,19 +19,7 @@ on:
       - 'components/operator/**'
       - 'components/backend/**'
       - 'components/frontend/**'
-      - 'components/public-api/**'
   workflow_dispatch:
-    inputs:
-      force_build_all:
-        description: 'Force rebuild all components'
-        required: false
-        type: boolean
-        default: false
-      components:
-        description: 'Components to build (comma-separated: frontend,backend,operator,claude-runner,state-sync,public-api) - leave empty for all'
-        required: false
-        type: string
-        default: ''
 
 concurrency:
   group: components-build-deploy-${{ github.event.pull_request.number || github.ref }}
@@ -46,11 +33,9 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       operator: ${{ steps.filter.outputs.operator }}
       claude-runner: ${{ steps.filter.outputs.claude-runner }}
-      state-sync: ${{ steps.filter.outputs.state-sync }}
-      public-api: ${{ steps.filter.outputs.public-api }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -66,11 +51,7 @@ jobs:
             operator:
               - 'components/operator/**'
             claude-runner:
-              - 'components/runners/claude-code-runner/**'
-            state-sync:
-              - 'components/runners/state-sync/**'
-            public-api:
-              - 'components/public-api/**'
+              - 'components/runners/**'
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -103,29 +84,21 @@ jobs:
             image: quay.io/ambient_code/vteam_claude_runner
             dockerfile: ./components/runners/claude-code-runner/Dockerfile
             changed: ${{ needs.detect-changes.outputs.claude-runner }}
-          - name: state-sync
-            context: ./components/runners/state-sync
-            image: quay.io/ambient_code/vteam_state_sync
-            dockerfile: ./components/runners/state-sync/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.state-sync }}
-          - name: public-api
-            context: ./components/public-api
-            image: quay.io/ambient_code/vteam_public_api
-            dockerfile: ./components/public-api/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.public-api }}
     steps:
       - name: Checkout code
-        if: matrix.component.changed == 'true' || github.event.inputs.force_build_all == 'true' || contains(github.event.inputs.components, matrix.component.name) || (github.event_name == 'workflow_dispatch' && github.event.inputs.components == '' && github.event.inputs.force_build_all != 'true')
-        uses: actions/checkout@v6
+        if: matrix.component.changed == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Docker Buildx
-        if: matrix.component.changed == 'true' || github.event.inputs.force_build_all == 'true' || contains(github.event.inputs.components, matrix.component.name) || (github.event_name == 'workflow_dispatch' && github.event.inputs.components == '' && github.event.inputs.force_build_all != 'true')
+        if: matrix.component.changed == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
 
       - name: Log in to Quay.io
-        if: matrix.component.changed == 'true' || github.event.inputs.force_build_all == 'true' || contains(github.event.inputs.components, matrix.component.name) || (github.event_name == 'workflow_dispatch' && github.event.inputs.components == '' && github.event.inputs.force_build_all != 'true')
+        if: matrix.component.changed == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: quay.io
@@ -133,7 +106,7 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Log in to Red Hat Container Registry
-        if: matrix.component.changed == 'true' || github.event.inputs.force_build_all == 'true' || contains(github.event.inputs.components, matrix.component.name) || (github.event_name == 'workflow_dispatch' && github.event.inputs.components == '' && github.event.inputs.force_build_all != 'true')
+        if: matrix.component.changed == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: registry.redhat.io
@@ -141,7 +114,7 @@ jobs:
           password: ${{ secrets.REDHAT_PASSWORD }}
 
       - name: Build and push ${{ matrix.component.name }} image only for merge into main
-        if: (matrix.component.changed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event.inputs.force_build_all == 'true' || contains(github.event.inputs.components, matrix.component.name) || (github.event_name == 'workflow_dispatch' && github.event.inputs.components == '' && github.event.inputs.force_build_all != 'true')
+        if: (matrix.component.changed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.component.context }}
@@ -156,13 +129,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build ${{ matrix.component.name }} image for pull requests but don't push
-        if: (matrix.component.changed == 'true' || github.event.inputs.force_build_all == 'true' || contains(github.event.inputs.components, matrix.component.name)) && github.event_name == 'pull_request_target'
+        if: (matrix.component.changed == 'true' || github.event_name == 'workflow_dispatch') && github.event_name == 'pull_request_target'
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.component.context }}
           file: ${{ matrix.component.dockerfile }}
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: false
           tags: ${{ matrix.component.image }}:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -173,7 +146,7 @@ jobs:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Install oc
         uses: redhat-actions/oc-installer@v1
@@ -190,17 +163,13 @@ jobs:
           oc apply -k components/manifests/base/rbac/
           oc apply -f components/manifests/overlays/production/operator-config-openshift.yaml -n ambient-code
 
-      - name: Deploy observability stack
-        run: |
-          oc apply -k components/manifests/observability/
-
   deploy-to-openshift:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-and-push, update-rbac-and-crd]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.operator == 'true' || needs.detect-changes.outputs.claude-runner == 'true' || needs.detect-changes.outputs.state-sync == 'true' || needs.detect-changes.outputs.public-api == 'true')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.operator == 'true' || needs.detect-changes.outputs.claude-runner == 'true')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Install oc
         uses: redhat-actions/oc-installer@v1
@@ -243,18 +212,6 @@ jobs:
           else
             echo "runner_tag=stage" >> $GITHUB_OUTPUT
           fi
-          
-          if [ "${{ needs.detect-changes.outputs.state-sync }}" == "true" ]; then
-            echo "state_sync_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "state_sync_tag=stage" >> $GITHUB_OUTPUT
-          fi
-
-          if [ "${{ needs.detect-changes.outputs.public-api }}" == "true" ]; then
-            echo "public_api_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "public_api_tag=stage" >> $GITHUB_OUTPUT
-          fi
 
       - name: Update kustomization with image tags
         working-directory: components/manifests/overlays/production
@@ -263,8 +220,6 @@ jobs:
           kustomize edit set image quay.io/ambient_code/vteam_backend:latest=quay.io/ambient_code/vteam_backend:${{ steps.image-tags.outputs.backend_tag }}
           kustomize edit set image quay.io/ambient_code/vteam_operator:latest=quay.io/ambient_code/vteam_operator:${{ steps.image-tags.outputs.operator_tag }}
           kustomize edit set image quay.io/ambient_code/vteam_claude_runner:latest=quay.io/ambient_code/vteam_claude_runner:${{ steps.image-tags.outputs.runner_tag }}
-          kustomize edit set image quay.io/ambient_code/vteam_state_sync:latest=quay.io/ambient_code/vteam_state_sync:${{ steps.image-tags.outputs.state_sync_tag }}
-          kustomize edit set image quay.io/ambient_code/vteam_public_api:latest=quay.io/ambient_code/vteam_public_api:${{ steps.image-tags.outputs.public_api_tag }}
 
       - name: Validate kustomization
         working-directory: components/manifests/overlays/production
@@ -280,24 +235,17 @@ jobs:
       - name: Update frontend environment variables
         if: needs.detect-changes.outputs.frontend == 'true'
         run: |
-          oc set env deployment/frontend -n ambient-code -c frontend \
-            GITHUB_APP_SLUG="ambient-code-stage" \
-            VTEAM_VERSION="${{ github.sha }}" \
-            FEEDBACK_URL="https://forms.gle/7XiWrvo6No922DUz6"
+          oc patch deployment frontend -n ambient-code --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env", "value": [{"name":"BACKEND_URL","value":"http://backend-service:8080/api"},{"name":"NODE_ENV","value":"production"},{"name":"GITHUB_APP_SLUG","value":"ambient-code-stage"},{"name":"VTEAM_VERSION","value":"${{ github.sha }}"}]}]'
 
       - name: Update backend environment variables
         if: needs.detect-changes.outputs.backend == 'true'
         run: |
-          oc set env deployment/backend-api -n ambient-code -c backend-api \
-            CONTENT_SERVICE_IMAGE="quay.io/ambient_code/vteam_backend:${{ steps.image-tags.outputs.backend_tag }}"
+          oc patch deployment backend-api -n ambient-code --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env", "value": [{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"PORT","value":"8080"},{"name":"STATE_BASE_DIR","value":"/workspace"},{"name":"SPEC_KIT_REPO","value":"ambient-code/spec-kit-rh"},{"name":"SPEC_KIT_VERSION","value":"main"},{"name":"SPEC_KIT_TEMPLATE","value":"spec-kit-template-claude-sh"},{"name":"CONTENT_SERVICE_IMAGE","value":"quay.io/ambient_code/vteam_backend:${{ steps.image-tags.outputs.backend_tag }}"},{"name":"IMAGE_PULL_POLICY","value":"Always"},{"name":"OOTB_WORKFLOWS_REPO","value":"https://github.com/ambient-code/ootb-ambient-workflows.git"},{"name":"OOTB_WORKFLOWS_BRANCH","value":"main"},{"name":"OOTB_WORKFLOWS_PATH","value":"workflows"},{"name":"CLAUDE_CODE_USE_VERTEX","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"CLAUDE_CODE_USE_VERTEX"}}},{"name":"GITHUB_APP_ID","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_APP_ID","optional":true}}},{"name":"GITHUB_PRIVATE_KEY","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_PRIVATE_KEY","optional":true}}},{"name":"GITHUB_CLIENT_ID","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_CLIENT_ID","optional":true}}},{"name":"GITHUB_CLIENT_SECRET","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_CLIENT_SECRET","optional":true}}},{"name":"GITHUB_STATE_SECRET","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_STATE_SECRET","optional":true}}}]}]'
 
       - name: Update operator environment variables
-        if: needs.detect-changes.outputs.operator == 'true' || needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.claude-runner == 'true' || needs.detect-changes.outputs.state-sync == 'true'
+        if: needs.detect-changes.outputs.operator == 'true' || needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.claude-runner == 'true'
         run: |
-          oc set env deployment/agentic-operator -n ambient-code -c agentic-operator \
-            AMBIENT_CODE_RUNNER_IMAGE="quay.io/ambient_code/vteam_claude_runner:${{ steps.image-tags.outputs.runner_tag }}" \
-            CONTENT_SERVICE_IMAGE="quay.io/ambient_code/vteam_backend:${{ steps.image-tags.outputs.backend_tag }}" \
-            STATE_SYNC_IMAGE="quay.io/ambient_code/vteam_state_sync:${{ steps.image-tags.outputs.state_sync_tag }}"
+          oc patch deployment agentic-operator -n ambient-code --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env", "value": [{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"BACKEND_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"BACKEND_API_URL","value":"http://backend-service:8080/api"},{"name":"AMBIENT_CODE_RUNNER_IMAGE","value":"quay.io/ambient_code/vteam_claude_runner:${{ steps.image-tags.outputs.runner_tag }}"},{"name":"CONTENT_SERVICE_IMAGE","value":"quay.io/ambient_code/vteam_backend:${{ steps.image-tags.outputs.backend_tag }}"},{"name":"IMAGE_PULL_POLICY","value":"Always"},{"name":"CLAUDE_CODE_USE_VERTEX","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"CLAUDE_CODE_USE_VERTEX"}}},{"name":"CLOUD_ML_REGION","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"CLOUD_ML_REGION"}}},{"name":"ANTHROPIC_VERTEX_PROJECT_ID","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"ANTHROPIC_VERTEX_PROJECT_ID"}}},{"name":"GOOGLE_APPLICATION_CREDENTIALS","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"GOOGLE_APPLICATION_CREDENTIALS"}}},{"name":"LANGFUSE_ENABLED","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_ENABLED","optional":true}}},{"name":"LANGFUSE_HOST","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_HOST","optional":true}}},{"name":"LANGFUSE_PUBLIC_KEY","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_PUBLIC_KEY","optional":true}}},{"name":"LANGFUSE_SECRET_KEY","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_SECRET_KEY","optional":true}}}]}]'
 
   deploy-with-disptach:
     runs-on: ubuntu-latest
@@ -305,7 +253,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Install oc
         uses: redhat-actions/oc-installer@v1
@@ -329,8 +277,6 @@ jobs:
           kustomize edit set image quay.io/ambient_code/vteam_backend:latest=quay.io/ambient_code/vteam_backend:stage
           kustomize edit set image quay.io/ambient_code/vteam_operator:latest=quay.io/ambient_code/vteam_operator:stage
           kustomize edit set image quay.io/ambient_code/vteam_claude_runner:latest=quay.io/ambient_code/vteam_claude_runner:stage
-          kustomize edit set image quay.io/ambient_code/vteam_state_sync:latest=quay.io/ambient_code/vteam_state_sync:stage
-          kustomize edit set image quay.io/ambient_code/vteam_public_api:latest=quay.io/ambient_code/vteam_public_api:stage
 
       - name: Validate kustomization
         working-directory: components/manifests/overlays/production
@@ -345,19 +291,12 @@ jobs:
 
       - name: Update frontend environment variables
         run: |
-          oc set env deployment/frontend -n ambient-code -c frontend \
-            GITHUB_APP_SLUG="ambient-code-stage" \
-            VTEAM_VERSION="${{ github.sha }}" \
-            FEEDBACK_URL="https://forms.gle/7XiWrvo6No922DUz6"
+          oc patch deployment frontend -n ambient-code --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env", "value": [{"name":"BACKEND_URL","value":"http://backend-service:8080/api"},{"name":"NODE_ENV","value":"production"},{"name":"GITHUB_APP_SLUG","value":"ambient-code-stage"},{"name":"VTEAM_VERSION","value":"${{ github.sha }}"}]}]'
 
       - name: Update backend environment variables
         run: |
-          oc set env deployment/backend-api -n ambient-code -c backend-api \
-            CONTENT_SERVICE_IMAGE="quay.io/ambient_code/vteam_backend:stage"
+          oc patch deployment backend-api -n ambient-code --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env", "value": [{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"PORT","value":"8080"},{"name":"STATE_BASE_DIR","value":"/workspace"},{"name":"SPEC_KIT_REPO","value":"ambient-code/spec-kit-rh"},{"name":"SPEC_KIT_VERSION","value":"main"},{"name":"SPEC_KIT_TEMPLATE","value":"spec-kit-template-claude-sh"},{"name":"CONTENT_SERVICE_IMAGE","value":"quay.io/ambient_code/vteam_backend:stage"},{"name":"IMAGE_PULL_POLICY","value":"Always"},{"name":"OOTB_WORKFLOWS_REPO","value":"https://github.com/ambient-code/ootb-ambient-workflows.git"},{"name":"OOTB_WORKFLOWS_BRANCH","value":"main"},{"name":"OOTB_WORKFLOWS_PATH","value":"workflows"},{"name":"CLAUDE_CODE_USE_VERTEX","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"CLAUDE_CODE_USE_VERTEX"}}},{"name":"GITHUB_APP_ID","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_APP_ID","optional":true}}},{"name":"GITHUB_PRIVATE_KEY","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_PRIVATE_KEY","optional":true}}},{"name":"GITHUB_CLIENT_ID","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_CLIENT_ID","optional":true}}},{"name":"GITHUB_CLIENT_SECRET","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_CLIENT_SECRET","optional":true}}},{"name":"GITHUB_STATE_SECRET","valueFrom":{"secretKeyRef":{"name":"github-app-secret","key":"GITHUB_STATE_SECRET","optional":true}}}]}]'
 
       - name: Update operator environment variables
         run: |
-          oc set env deployment/agentic-operator -n ambient-code -c agentic-operator \
-            AMBIENT_CODE_RUNNER_IMAGE="quay.io/ambient_code/vteam_claude_runner:stage" \
-            CONTENT_SERVICE_IMAGE="quay.io/ambient_code/vteam_backend:stage" \
-            STATE_SYNC_IMAGE="quay.io/ambient_code/vteam_state_sync:stage"
+          oc patch deployment agentic-operator -n ambient-code --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env", "value": [{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"BACKEND_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"BACKEND_API_URL","value":"http://backend-service:8080/api"},{"name":"AMBIENT_CODE_RUNNER_IMAGE","value":"quay.io/ambient_code/vteam_claude_runner:stage"},{"name":"CONTENT_SERVICE_IMAGE","value":"quay.io/ambient_code/vteam_backend:stage"},{"name":"IMAGE_PULL_POLICY","value":"Always"},{"name":"CLAUDE_CODE_USE_VERTEX","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"CLAUDE_CODE_USE_VERTEX"}}},{"name":"CLOUD_ML_REGION","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"CLOUD_ML_REGION"}}},{"name":"ANTHROPIC_VERTEX_PROJECT_ID","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"ANTHROPIC_VERTEX_PROJECT_ID"}}},{"name":"GOOGLE_APPLICATION_CREDENTIALS","valueFrom":{"configMapKeyRef":{"name":"operator-config","key":"GOOGLE_APPLICATION_CREDENTIALS"}}},{"name":"LANGFUSE_ENABLED","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_ENABLED","optional":true}}},{"name":"LANGFUSE_HOST","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_HOST","optional":true}}},{"name":"LANGFUSE_PUBLIC_KEY","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_PUBLIC_KEY","optional":true}}},{"name":"LANGFUSE_SECRET_KEY","valueFrom":{"secretKeyRef":{"name":"ambient-admin-langfuse-secret","key":"LANGFUSE_SECRET_KEY","optional":true}}}]}]'

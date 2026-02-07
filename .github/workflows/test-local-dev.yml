@@ -10,18 +10,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Cleanup Diskspace
-      id: cleanup
-      uses: kubeflow/pipelines/.github/actions/github-disk-cleanup@master
-      if: (!cancelled())
-
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: 'components/backend/go.mod'
-        cache-dependency-path: 'components/backend/go.sum'
+      uses: actions/checkout@v5
       
     - name: Install minikube and kubectl
       run: |
@@ -46,7 +35,7 @@ jobs:
     - name: Deploy using Makefile
       run: |
         echo "Using Makefile to deploy complete stack..."
-        make local-up CONTAINER_ENGINE=docker CI_MODE=true
+        make local-up CONTAINER_ENGINE=docker
         
     - name: Wait for deployments
       run: |
@@ -55,47 +44,17 @@ jobs:
           echo "⚠️  Backend deployment timeout - showing status"
           kubectl get pods -n ambient-code -o wide
           kubectl describe deployment backend-api -n ambient-code | tail -50
-          echo "⚠️  Backend pod events:"
-          kubectl get events -n ambient-code --field-selector involvedObject.kind=Pod,involvedObject.name!='' --sort-by='.lastTimestamp' | grep backend-api || echo "(No backend-api pod events found)"
-          echo "⚠️  Backend pod details:"
-          kubectl get pods -n ambient-code -l app=backend-api -o yaml | grep -A 20 -B 5 "conditions:\|events:\|status:" || true
-          exit 1
         }
         kubectl wait --for=condition=available --timeout=180s deployment/frontend -n ambient-code || {
           echo "⚠️  Frontend deployment timeout - showing status"
           kubectl get pods -n ambient-code -o wide
           kubectl describe deployment frontend -n ambient-code | tail -50
-          exit 1
         }
         kubectl wait --for=condition=available --timeout=180s deployment/agentic-operator -n ambient-code || {
           echo "⚠️  Operator deployment timeout - showing status"
           kubectl get pods -n ambient-code -o wide
           kubectl describe deployment agentic-operator -n ambient-code | tail -50
-          exit 1
         }
-
-    - name: Run backend integration tests (real k8s auth path)
-      run: |
-        set -euo pipefail
-
-        echo "Setting up ServiceAccount + RBAC for backend integration tests..."
-        kubectl -n ambient-code create serviceaccount backend-integration-test 2>/dev/null || true
-        kubectl -n ambient-code create role backend-integration-test \
-          --verb=get,list \
-          --resource=configmaps 2>/dev/null || true
-        kubectl -n ambient-code create rolebinding backend-integration-test \
-          --role=backend-integration-test \
-          --serviceaccount=ambient-code:backend-integration-test 2>/dev/null || true
-
-        TEST_TOKEN="$(kubectl -n ambient-code create token backend-integration-test)"
-        echo "::add-mask::$TEST_TOKEN"
-
-        echo "Running Go integration tests (skips any external-provider tests without env)..."
-        cd components/backend
-        INTEGRATION_TESTS=true \
-        K8S_TEST_TOKEN="$TEST_TOKEN" \
-        K8S_TEST_NAMESPACE="ambient-code" \
-        go test ./tests/integration/... -count=1 -timeout=10m
     
     - name: Run Makefile smoke tests
       run: |

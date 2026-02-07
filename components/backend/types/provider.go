@@ -49,11 +49,8 @@ func DetectProvider(repoURL string) ProviderType {
 		return ""
 	}
 
-	// Check for GitHub:
-	// - github.com (public)
-	// - *.github.com (enterprise variants like company.github.com)
-	// - github.* (enterprise variants like github.company.com)
-	if hostname == "github.com" || strings.HasSuffix(hostname, ".github.com") || strings.HasPrefix(hostname, "github.") {
+	// Check for GitHub (github.com or *.github.com for enterprise)
+	if hostname == "github.com" || strings.HasSuffix(hostname, ".github.com") {
 		return ProviderGitHub
 	}
 

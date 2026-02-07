@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "webfetch": {
-      "command": "uvx",
-      "args": ["mcp-server-fetch"]
-    },
     "mcp-atlassian": {
       "command": "mcp-atlassian",
       "args": [],
@@ -12,21 +8,6 @@
         "JIRA_PERSONAL_TOKEN": "${JIRA_API_TOKEN}",
         "JIRA_SSL_VERIFY": "true",
         "READ_ONLY_MODE": "true"
-      }
-    },
-    "google-workspace": {
-      "command": "uvx",
-      "args": [
-        "workspace-mcp@1.6.1",
-        "--tools",
-        "drive"
-      ],
-      "env": {
-        "GOOGLE_MCP_CREDENTIALS_DIR": "${GOOGLE_MCP_CREDENTIALS_DIR}",
-        "MCP_SINGLE_USER_MODE": "1",
-        "GOOGLE_OAUTH_CLIENT_ID": "${GOOGLE_OAUTH_CLIENT_ID}",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "${GOOGLE_OAUTH_CLIENT_SECRET}",
-        "USER_GOOGLE_EMAIL": "${USER_GOOGLE_EMAIL:-user@example.com}"
       }
     }
   }

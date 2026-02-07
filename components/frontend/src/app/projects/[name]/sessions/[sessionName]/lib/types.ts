@@ -32,7 +32,7 @@ export type GitStatus = {
 };
 
 export type DirectoryOption = {
-  type: 'artifacts' | 'repo' | 'workflow' | 'file-uploads';
+  type: 'artifacts' | 'repo' | 'workflow';
   name: string;
   path: string;
 };

@@ -6,8 +6,6 @@ metadata:
     app: agentic-operator
     deployment-type: e2e
 data:
-  # Use local runner image loaded into kind cluster (not quay.io)
-  AMBIENT_CODE_RUNNER_IMAGE: "vteam_claude_runner:latest"
   # Vertex AI Configuration - Disabled for e2e testing
   CLAUDE_CODE_USE_VERTEX: "0"
   CLOUD_ML_REGION: ""
