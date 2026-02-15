@@ -43,14 +43,16 @@ interface UseSessionQueueReturn {
   messages: QueuedMessageItem[];
   addMessage: (content: string) => void;
   markMessageSent: (messageId: string) => void;
+  cancelMessage: (messageId: string) => void;
   clearMessages: () => void;
-  
+  pendingCount: number;
+
   // Workflow queue operations
   workflow: QueuedWorkflowItem | null;
   setWorkflow: (workflow: Omit<QueuedWorkflowItem, 'timestamp'>) => void;
   markWorkflowActivated: (workflowId: string) => void;
   clearWorkflow: () => void;
-  
+
   // Metadata operations
   metadata: QueueMetadata;
   updateMetadata: (updates: Partial<QueueMetadata>) => void;
@@ -183,9 +185,16 @@ export function useSessionQueue(
     );
   }, []);
 
+  const cancelMessage = useCallback((messageId: string) => {
+    setMessages(prev => prev.filter(msg => msg.id !== messageId));
+  }, []);
+
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
+
+  // Derived state: count of unsent messages
+  const pendingCount = messages.filter(msg => !msg.sentAt).length;
 
   // Workflow operations
   const setWorkflow = useCallback((workflowData: Omit<QueuedWorkflowItem, 'timestamp'>) => {
@@ -216,7 +225,9 @@ export function useSessionQueue(
     messages,
     addMessage,
     markMessageSent,
+    cancelMessage,
     clearMessages,
+    pendingCount,
     workflow,
     setWorkflow,
     markWorkflowActivated,
