@@ -23,15 +23,13 @@ export function UserBubble() {
   }
 
   return (
-    <Button variant="ghost" size="sm" className="m-2 p-1 pr-2 cursor-pointer" asChild>
-      <div className="flex items-center gap-2">
-        <Avatar>
-          <AvatarImage alt={me.displayName || initials} />
-          <AvatarFallback>{initials || "?"}</AvatarFallback>
-        </Avatar>
-        <span className="hidden sm:block text-sm text-muted-foreground">{me.displayName}</span>
-      </div>
-    </Button>
+    <div className="flex items-center gap-2 m-2 p-1 pr-2 cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+      <Avatar>
+        <AvatarImage alt={me.displayName || initials} />
+        <AvatarFallback>{initials || "?"}</AvatarFallback>
+      </Avatar>
+      <span className="hidden sm:block text-sm text-muted-foreground">{me.displayName}</span>
+    </div>
   );
 }
 

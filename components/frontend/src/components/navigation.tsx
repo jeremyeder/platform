@@ -57,8 +57,10 @@ export function Navigation({ feedbackUrl }: NavigationProps) {
             )}
             <ThemeToggle />
             <DropdownMenu>
-              <DropdownMenuTrigger className="outline-none">
-                <UserBubble />
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="outline-none">
+                  <UserBubble />
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => router.push('/integrations')}>
