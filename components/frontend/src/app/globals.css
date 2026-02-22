@@ -65,38 +65,38 @@
 }
 
 :root {
-  /* Star Wars Lightsaber Theme - Light mode fallback (rarely used) */
+  /* Star Wars Lightsaber Theme - Light mode fallback (rarely used, also dark) */
   --radius: 0.625rem;
-  --background: oklch(0.15 0.02 270);              /* Deep space dark */
+  --background: oklch(0 0 0);                      /* True black */
   --foreground: oklch(0.92 0.02 250);              /* Soft light blue-white */
-  --card: oklch(0.18 0.025 270);                   /* Slightly lighter dark */
+  --card: oklch(0.08 0 0);                         /* Near-black card */
   --card-foreground: oklch(0.92 0.02 250);
-  --popover: oklch(0.18 0.025 270);
+  --popover: oklch(0.10 0 0);                      /* Slightly lighter popover */
   --popover-foreground: oklch(0.92 0.02 250);
   --primary: oklch(0.65 0.25 250);                 /* Lightsaber blue (Luke/Anakin) */
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.55 0.22 290);               /* Lightsaber purple (Mace Windu) */
   --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.22 0.02 270);
+  --muted: oklch(0.12 0 0);                        /* Dark muted */
   --muted-foreground: oklch(0.65 0.03 250);
   --accent: oklch(0.60 0.24 270);                  /* Blue-purple blend */
   --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.55 0.28 25);              /* Sith red for destructive */
-  --border: oklch(0.30 0.05 270);
-  --input: oklch(0.22 0.03 270);
+  --border: oklch(0.20 0.03 270);                  /* Subtle purple-tinted border */
+  --input: oklch(0.08 0 0);                        /* Near-black input */
   --ring: oklch(0.65 0.25 250);                    /* Blue lightsaber glow */
   --chart-1: oklch(0.65 0.25 250);                 /* Blue */
   --chart-2: oklch(0.55 0.22 290);                 /* Purple */
   --chart-3: oklch(0.60 0.24 270);                 /* Blue-purple */
   --chart-4: oklch(0.70 0.20 220);                 /* Cyan */
   --chart-5: oklch(0.50 0.18 310);                 /* Magenta */
-  --sidebar: oklch(0.12 0.02 270);                 /* Deep dark sidebar */
+  --sidebar: oklch(0 0 0);                         /* True black sidebar */
   --sidebar-foreground: oklch(0.92 0.02 250);
   --sidebar-primary: oklch(0.65 0.25 250);
   --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-accent: oklch(0.55 0.22 290);
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.30 0.05 270);
+  --sidebar-border: oklch(0.18 0.03 270);          /* Subtle border */
   --sidebar-ring: oklch(0.65 0.25 250);
 
   /* Status badge semantic colors - Star Wars themed */
@@ -128,36 +128,36 @@
 
 .dark {
   /* Star Wars Lightsaber Theme - Dark mode (PRIMARY) */
-  --background: oklch(0.08 0.015 270);              /* Deep space black with subtle purple */
+  --background: oklch(0 0 0);                       /* True black */
   --foreground: oklch(0.92 0.03 250);               /* Soft blue-white text */
-  --card: oklch(0.12 0.025 270);                    /* Card with subtle purple tint */
+  --card: oklch(0.08 0 0);                          /* Near-black card */
   --card-foreground: oklch(0.92 0.03 250);
-  --popover: oklch(0.14 0.03 270);
+  --popover: oklch(0.10 0 0);                       /* Slightly lighter popover */
   --popover-foreground: oklch(0.92 0.03 250);
   --primary: oklch(0.68 0.28 250);                  /* Bright lightsaber blue (glowing) */
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.58 0.25 290);                /* Mace Windu purple lightsaber */
   --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.18 0.02 270);
+  --muted: oklch(0.12 0 0);                         /* Dark muted */
   --muted-foreground: oklch(0.60 0.04 250);
   --accent: oklch(0.62 0.26 270);                   /* Blue-purple lightsaber blend */
   --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.58 0.30 25);               /* Sith red lightsaber */
-  --border: oklch(0.25 0.06 270);                   /* Purple-tinted border */
-  --input: oklch(0.15 0.03 270);
+  --border: oklch(0.20 0.03 270);                   /* Subtle purple-tinted border */
+  --input: oklch(0.08 0 0);                         /* Near-black input */
   --ring: oklch(0.68 0.28 250);                     /* Blue lightsaber glow ring */
   --chart-1: oklch(0.68 0.28 250);                  /* Blue lightsaber */
   --chart-2: oklch(0.58 0.25 290);                  /* Purple lightsaber */
   --chart-3: oklch(0.65 0.26 270);                  /* Blue-purple */
   --chart-4: oklch(0.72 0.22 220);                  /* Cyan/ice blue */
   --chart-5: oklch(0.55 0.20 310);                  /* Magenta */
-  --sidebar: oklch(0.06 0.015 270);                 /* Darkest space black */
+  --sidebar: oklch(0 0 0);                          /* True black sidebar */
   --sidebar-foreground: oklch(0.92 0.03 250);
   --sidebar-primary: oklch(0.68 0.28 250);          /* Blue lightsaber */
   --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-accent: oklch(0.58 0.25 290);           /* Purple accent */
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.22 0.05 270);
+  --sidebar-border: oklch(0.18 0.03 270);           /* Subtle border */
   --sidebar-ring: oklch(0.68 0.28 250);
 
   /* Status badge semantic colors - Dark theme Star Wars */
