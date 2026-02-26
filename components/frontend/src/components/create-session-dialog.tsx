@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LabelEditor } from "@/components/label-editor";
+import type { LabelEditorHandle } from "@/components/label-editor";
 import type { CreateAgenticSessionRequest } from "@/types/agentic-session";
 import { useCreateSession } from "@/services/queries/use-sessions";
 import { useRunnerTypes } from "@/services/queries/use-runner-types";
@@ -71,6 +72,7 @@ export function CreateSessionDialog({
 }: CreateSessionDialogProps) {
   const [open, setOpen] = useState(false);
   const [labels, setLabels] = useState<Record<string, string>>({});
+  const labelEditorRef = useRef<LabelEditorHandle>(null);
   const router = useRouter();
   const createSessionMutation = useCreateSession();
   const { data: runnerTypes, isLoading: runnerTypesLoading, isError: runnerTypesError, refetch: refetchRunnerTypes } = useRunnerTypes(projectName);
@@ -128,6 +130,11 @@ export function CreateSessionDialog({
 
   const onSubmit = async (values: FormValues) => {
     if (!projectName) return;
+
+    // Auto-add any valid pending label input the user forgot to click +Add for
+    if (labelEditorRef.current && !labelEditorRef.current.flush()) {
+      return; // invalid partial text — let them fix it
+    }
 
     const request: CreateAgenticSessionRequest = {
       runnerType: values.runnerType,
@@ -301,6 +308,7 @@ export function CreateSessionDialog({
               <div className="w-full space-y-2">
                 <FormLabel>Labels</FormLabel>
                 <LabelEditor
+                  ref={labelEditorRef}
                   labels={labels}
                   onChange={setLabels}
                   disabled={createSessionMutation.isPending}
