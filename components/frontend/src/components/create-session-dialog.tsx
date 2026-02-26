@@ -304,7 +304,7 @@ export function CreateSessionDialog({
                   labels={labels}
                   onChange={setLabels}
                   disabled={createSessionMutation.isPending}
-                  suggestions={["team", "type", "priority", "feature"]}
+                  suggestions={["issue", "research", "team", "type", "other"]}
                 />
               </div>
 
@@ -346,12 +346,14 @@ export function CreateSessionDialog({
   );
 }
 
-function IntegrationCard({ name, connected, connectedText, disconnectedText }: {
+type IntegrationCardProps = {
   name: string;
   connected: boolean;
   connectedText: string;
   disconnectedText: string;
-}) {
+};
+
+function IntegrationCard({ name, connected, connectedText, disconnectedText }: IntegrationCardProps) {
   return (
     <div className="flex items-start gap-3 p-3 border rounded-lg bg-background/50">
       <div className="flex-shrink-0">
