@@ -247,16 +247,16 @@ func TestE2E_CreateSessionRun(t *testing.T) {
 		backendStatus  int
 		backendResp    string
 		expectedStatus int
-		expectRunID    bool
+		expectSSE      bool
 	}{
 		{
-			name:           "Successful run creation",
+			name:           "Successful run streams SSE",
 			sessionID:      "test-session",
 			requestBody:    `{"prompt": "Fix the authentication bug"}`,
 			backendStatus:  http.StatusOK,
-			backendResp:    `{"runId": "run-abc123", "threadId": "test-session"}`,
+			backendResp:    "data: {\"type\":\"RUN_STARTED\"}\n\ndata: {\"type\":\"TEXT\"}\n\n",
 			expectedStatus: http.StatusOK,
-			expectRunID:    true,
+			expectSSE:      true,
 		},
 		{
 			name:           "Missing prompt returns 400",
@@ -265,7 +265,7 @@ func TestE2E_CreateSessionRun(t *testing.T) {
 			backendStatus:  http.StatusOK,
 			backendResp:    `{}`,
 			expectedStatus: http.StatusBadRequest,
-			expectRunID:    false,
+			expectSSE:      false,
 		},
 		{
 			name:           "Backend error forwarded",
@@ -274,7 +274,7 @@ func TestE2E_CreateSessionRun(t *testing.T) {
 			backendStatus:  http.StatusBadRequest,
 			backendResp:    `{"error": "Session not running"}`,
 			expectedStatus: http.StatusBadRequest,
-			expectRunID:    false,
+			expectSSE:      false,
 		},
 		{
 			name:           "Invalid session ID returns 400",
@@ -283,21 +283,23 @@ func TestE2E_CreateSessionRun(t *testing.T) {
 			backendStatus:  http.StatusOK,
 			backendResp:    `{}`,
 			expectedStatus: http.StatusBadRequest,
-			expectRunID:    false,
+			expectSSE:      false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify path contains agui/run for valid requests
-				if tt.expectedStatus != http.StatusBadRequest || tt.backendStatus != http.StatusOK {
+				if tt.expectSSE {
 					if !strings.Contains(r.URL.Path, "agui/run") {
 						t.Errorf("Expected path to contain agui/run, got %s", r.URL.Path)
 					}
+					w.Header().Set("Content-Type", "text/event-stream")
+					w.WriteHeader(tt.backendStatus)
+				} else {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(tt.backendStatus)
 				}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(tt.backendStatus)
 				w.Write([]byte(tt.backendResp))
 			}))
 			defer backend.Close()
@@ -319,16 +321,14 @@ func TestE2E_CreateSessionRun(t *testing.T) {
 				t.Errorf("Expected status %d, got %d: %s", tt.expectedStatus, w.Code, w.Body.String())
 			}
 
-			if tt.expectRunID {
-				var resp map[string]string
-				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-					t.Fatalf("Failed to parse response: %v", err)
+			if tt.expectSSE {
+				contentType := w.Header().Get("Content-Type")
+				if contentType != "text/event-stream" {
+					t.Errorf("Expected Content-Type text/event-stream, got %s", contentType)
 				}
-				if resp["runId"] == "" {
-					t.Errorf("Expected runId in response, got %v", resp)
-				}
-				if resp["threadId"] == "" {
-					t.Errorf("Expected threadId in response, got %v", resp)
+				body := w.Body.String()
+				if !strings.Contains(body, "data:") {
+					t.Errorf("Expected SSE data events in body, got: %s", body)
 				}
 			}
 		})
@@ -343,9 +343,9 @@ func TestE2E_CreateSessionRun_MessageFormat(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
 			t.Errorf("Failed to decode request body: %v", err)
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"runId": "run-xyz", "threadId": "my-session"}`))
+		w.Write([]byte("data: {\"type\":\"RUN_STARTED\",\"runId\":\"run-xyz\",\"threadId\":\"my-session\"}\n\n"))
 	}))
 	defer backend.Close()
 

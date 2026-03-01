@@ -224,6 +224,7 @@ func DeleteSession(c *gin.Context) {
 
 // CreateSessionRun handles POST /v1/sessions/:id/runs
 // Delivers a prompt to an active session via the AG-UI run endpoint.
+// The backend returns an SSE stream which is proxied directly to the caller.
 func CreateSessionRun(c *gin.Context) {
 	project := GetProject(c)
 	if !ValidateProjectName(project) {
@@ -243,7 +244,6 @@ func CreateSessionRun(c *gin.Context) {
 	}
 
 	// Build AG-UI RunAgentInput from the simple prompt.
-	// The message ID uses the session ID and current timestamp for uniqueness.
 	msgID := fmt.Sprintf("msg-%s-%d", sessionID, time.Now().UnixNano())
 	backendReq := map[string]interface{}{
 		"threadId": sessionID,
@@ -273,26 +273,43 @@ func CreateSessionRun(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Failed to read backend response for session run %s: %v", sessionID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
 		forwardErrorResponse(c, resp.StatusCode, body)
 		return
 	}
 
-	var runResp types.RunResponse
-	if err := json.Unmarshal(body, &runResp); err != nil {
-		log.Printf("Failed to parse backend run response for session %s: %v", sessionID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
+	// The backend returns an SSE event stream — proxy it directly to the caller.
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Status(http.StatusOK)
+
+	// Flush headers immediately so the client knows it's an SSE stream.
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
 	}
 
-	c.JSON(http.StatusOK, runResp)
+	// Stream the backend response body directly to the client.
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := c.Writer.Write(buf[:n]); writeErr != nil {
+				log.Printf("Client disconnected during session run %s: %v", sessionID, writeErr)
+				return
+			}
+			if flusher, ok := c.Writer.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		}
+		if readErr != nil {
+			if readErr != io.EOF {
+				log.Printf("Backend stream error for session run %s: %v", sessionID, readErr)
+			}
+			return
+		}
+	}
 }
 
 // forwardErrorResponse forwards backend error with consistent JSON format

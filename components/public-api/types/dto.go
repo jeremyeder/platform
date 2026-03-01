@@ -41,9 +41,3 @@ type ErrorResponse struct {
 type CreateRunRequest struct {
 	Prompt string `json:"prompt" binding:"required"`
 }
-
-// RunResponse is the response after starting a run
-type RunResponse struct {
-	RunID    string `json:"runId"`
-	ThreadID string `json:"threadId"`
-}
