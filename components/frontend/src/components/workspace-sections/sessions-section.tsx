@@ -2,21 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, RefreshCw, MoreVertical, Square, Trash2, ArrowRight, Brain, Search, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { Plus, RefreshCw, MoreVertical, Square, Trash2, ArrowRight, Brain, Search, Pencil, Clock, Cpu, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Input } from '@/components/ui/input';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
+import { getPageNumbers } from '@/lib/pagination';
 import { EmptyState } from '@/components/empty-state';
 import { SessionPhaseBadge } from '@/components/status-badge';
 import { CreateSessionDialog } from '@/components/create-session-dialog';
 import { EditSessionNameDialog } from '@/components/edit-session-name-dialog';
 
 import { useSessionsPaginated, useStopSession, useDeleteSession, useContinueSession, useUpdateSessionDisplayName } from '@/services/queries';
-import { successToast, errorToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_SIZE } from '@/types/api';
 
@@ -59,7 +70,7 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
   const deleteSessionMutation = useDeleteSession();
   const continueSessionMutation = useContinueSession();
   const updateDisplayNameMutation = useUpdateSessionDisplayName();
-  
+
   // State for edit name dialog
   const [editingSession, setEditingSession] = useState<{ name: string; displayName: string } | null>(null);
 
@@ -68,10 +79,10 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
       { projectName, sessionName },
       {
         onSuccess: () => {
-          successToast(`Session "${sessionName}" stopped successfully`);
+          toast.success(`Session "${sessionName}" stopped successfully`);
         },
         onError: (error) => {
-          errorToast(error instanceof Error ? error.message : 'Failed to stop session');
+          toast.error(error instanceof Error ? error.message : 'Failed to stop session');
         },
       }
     );
@@ -83,10 +94,10 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
       { projectName, sessionName },
       {
         onSuccess: () => {
-          successToast(`Session "${sessionName}" deleted successfully`);
+          toast.success(`Session "${sessionName}" deleted successfully`);
         },
         onError: (error) => {
-          errorToast(error instanceof Error ? error.message : 'Failed to delete session');
+          toast.error(error instanceof Error ? error.message : 'Failed to delete session');
         },
       }
     );
@@ -97,10 +108,10 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
       { projectName, parentSessionName: sessionName },
       {
         onSuccess: () => {
-          successToast(`Session "${sessionName}" restarted successfully`);
+          toast.success(`Session "${sessionName}" restarted successfully`);
         },
         onError: (error) => {
-          errorToast(error instanceof Error ? error.message : 'Failed to restart session');
+          toast.error(error instanceof Error ? error.message : 'Failed to restart session');
         },
       }
     );
@@ -142,12 +153,12 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
       },
       {
         onSuccess: () => {
-          successToast('Session name updated successfully');
+          toast.success('Session name updated successfully');
           setEditingSession(null);
           refetch();
         },
         onError: (error) => {
-          errorToast(error instanceof Error ? error.message : 'Failed to update session name');
+          toast.error(error instanceof Error ? error.message : 'Failed to update session name');
         },
       }
     );
@@ -229,17 +240,52 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
                     return (
                       <TableRow key={session.metadata?.uid || session.metadata?.name}>
                         <TableCell className="font-medium min-w-[180px]">
-                          <Link
-                            href={`/projects/${projectName}/sessions/${session.metadata.name}`}
-                            className="text-link hover:underline hover:text-link-hover transition-colors block"
-                          >
-                            <div>
-                              <div className="font-medium">{session.spec.displayName || session.metadata.name}</div>
-                              {session.spec.displayName && (
-                                <div className="text-xs text-muted-foreground font-normal">{session.metadata.name}</div>
-                              )}
-                            </div>
-                          </Link>
+                          <HoverCard openDelay={300} closeDelay={100}>
+                            <HoverCardTrigger asChild>
+                              <Link
+                                href={`/projects/${projectName}/sessions/${session.metadata.name}`}
+                                className="text-link hover:underline hover:text-link-hover transition-colors block"
+                              >
+                                <div>
+                                  <div className="font-medium">{session.spec.displayName || session.metadata.name}</div>
+                                  {session.spec.displayName && (
+                                    <div className="text-xs text-muted-foreground font-normal">{session.metadata.name}</div>
+                                  )}
+                                </div>
+                              </Link>
+                            </HoverCardTrigger>
+                            <HoverCardContent align="start" className="w-80">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-semibold truncate mr-2">
+                                    {session.spec.displayName || session.metadata.name}
+                                  </p>
+                                  <SessionPhaseBadge phase={phase} stoppedReason={session.status?.stoppedReason} />
+                                </div>
+                                {session.spec.displayName && (
+                                  <p className="text-xs text-muted-foreground">{session.metadata.name}</p>
+                                )}
+                                <div className="flex flex-col gap-1.5 pt-1">
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Cpu className="h-3 w-3" />
+                                    <span>{session.spec.llmSettings.model}</span>
+                                  </div>
+                                  {session.metadata?.creationTimestamp && (
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                      <Clock className="h-3 w-3" />
+                                      <span>{formatDistanceToNow(new Date(session.metadata.creationTimestamp), { addSuffix: true })}</span>
+                                    </div>
+                                  )}
+                                  {session.spec.initialPrompt && (
+                                    <div className="flex items-start gap-1.5 text-xs text-muted-foreground pt-1">
+                                      <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
+                                      <span className="line-clamp-3">{session.spec.initialPrompt}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
                         </TableCell>
                         <TableCell>
                           <SessionPhaseBadge phase={phase} stoppedReason={session.status?.stoppedReason} />
@@ -287,35 +333,45 @@ export function SessionsSection({ projectName }: SessionsSectionProps) {
                 <div className="text-sm text-muted-foreground">
                   Showing {offset + 1}-{Math.min(offset + limit, totalCount)} of {totalCount} sessions
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrevPage}
-                    disabled={offset === 0 || isFetching}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleNextPage}
-                    disabled={!hasMore || isFetching}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
+                <Pagination className="mx-0 w-auto justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={handlePrevPage}
+                        className={offset === 0 || isFetching ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    {getPageNumbers(currentPage, totalPages).map((page, i) =>
+                      page === 'ellipsis' ? (
+                        <PaginationItem key={`ellipsis-${i}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            isActive={page === currentPage}
+                            onClick={() => { setOffset((page - 1) * limit); }}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    )}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={handleNextPage}
+                        className={!hasMore || isFetching ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
             )}
           </>
         )}
       </CardContent>
-      
+
       {/* Edit Session Name Dialog */}
       <EditSessionNameDialog
         open={!!editingSession}

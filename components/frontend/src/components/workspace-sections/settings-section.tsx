@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Save, Loader2, Info, AlertTriangle } from "lucide-react";
-import { Plus, Trash2, Eye, EyeOff, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, ChevronsUpDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { successToast, errorToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useProject, useUpdateProject } from "@/services/queries/use-projects";
 import { useSecretsValues, useUpdateSecrets, useIntegrationSecrets, useUpdateIntegrationSecrets } from "@/services/queries/use-secrets";
 import { useClusterInfo } from "@/hooks/use-cluster-info";
@@ -86,11 +87,11 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
       },
       {
         onSuccess: () => {
-          successToast("Project settings updated successfully!");
+          toast.success("Project settings updated successfully!");
         },
         onError: (error) => {
           const message = error instanceof Error ? error.message : "Failed to update project";
-          errorToast(message);
+          toast.error(message);
         },
       }
     );
@@ -104,7 +105,7 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
     if (anthropicApiKey) runnerData["ANTHROPIC_API_KEY"] = anthropicApiKey;
 
     if (Object.keys(runnerData).length === 0) {
-      errorToast("No Anthropic API key to save");
+      toast.error("No Anthropic API key to save");
       return;
     }
 
@@ -115,11 +116,11 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
       },
       {
         onSuccess: () => {
-          successToast("Saved to ambient-runner-secrets");
+          toast.success("Saved to ambient-runner-secrets");
         },
         onError: (error) => {
           const message = error instanceof Error ? error.message : "Failed to save Anthropic API key";
-          errorToast(message);
+          toast.error(message);
         },
       }
     );
@@ -151,7 +152,7 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
     }
 
     if (Object.keys(integrationData).length === 0) {
-      errorToast("No integration secrets to save");
+      toast.error("No integration secrets to save");
       return;
     }
 
@@ -162,11 +163,11 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
       },
       {
         onSuccess: () => {
-          successToast("Saved to ambient-non-vertex-integrations");
+          toast.success("Saved to ambient-non-vertex-integrations");
         },
         onError: (error) => {
           const message = error instanceof Error ? error.message : "Failed to save integration secrets";
-          errorToast(message);
+          toast.error(message);
         },
       }
     );
@@ -269,19 +270,15 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
           </Alert>
 
           {/* Anthropic Section */}
-          <div className="border rounded-lg">
-            <button
-              type="button"
-              onClick={() => setAnthropicExpanded(!anthropicExpanded)}
-              className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors rounded-lg"
-            >
+          <Collapsible open={anthropicExpanded} onOpenChange={setAnthropicExpanded} className="border rounded-lg">
+            <CollapsibleTrigger className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors rounded-lg">
               <div className="flex items-center gap-2">
-                {anthropicExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <ChevronsUpDown className="h-4 w-4" />
                 <span className="font-semibold">Anthropic</span>
                 {anthropicApiKey && <span className="text-xs text-muted-foreground">(configured)</span>}
               </div>
-            </button>
-            {anthropicExpanded && (
+            </CollapsibleTrigger>
+            <CollapsibleContent>
               <div className="px-3 pb-3 space-y-3 border-t pt-3">
                 {vertexEnabled && anthropicApiKey && (
                   <Alert variant="warning">
@@ -324,8 +321,8 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
                   </Button>
                 </div>
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Migration Notice */}
           <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
@@ -342,18 +339,15 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
           </div>
 
           {/* S3 Storage Configuration Section */}
-          <div className="space-y-3 pt-4 border-t">
-            <div
-              className="flex items-center justify-between cursor-pointer hover:opacity-80"
-              onClick={() => setS3Expanded((v) => !v)}
-            >
-              <div>
+          <Collapsible open={s3Expanded} onOpenChange={setS3Expanded} className="space-y-3 pt-4 border-t">
+            <CollapsibleTrigger className="flex items-center justify-between w-full cursor-pointer hover:opacity-80">
+              <div className="text-left">
                 <Label className="text-base font-semibold cursor-pointer">S3 Storage Configuration</Label>
                 <div className="text-xs text-muted-foreground mt-1">Configure S3-compatible storage for session artifacts and state</div>
               </div>
-              {s3Expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </div>
-            {s3Expanded && (
+              <ChevronsUpDown className="w-4 h-4 flex-shrink-0" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
               <div className="space-y-4 pl-1">
                 <Alert>
                   <Info className="h-4 w-4" />
@@ -469,8 +463,8 @@ export function SettingsSection({ projectName }: SettingsSectionProps) {
                   </>
                 )}
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Custom Environment Variables Section */}
           <div className="space-y-3 pt-2">

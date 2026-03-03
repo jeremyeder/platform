@@ -56,7 +56,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import Link from "next/link";
 import { SessionHeader } from "./session-header";
 import { getPhaseColor } from "@/utils/session-helpers";
 
@@ -97,7 +105,7 @@ import {
 import {
   useWorkspaceList,
 } from "@/services/queries/use-workspace";
-import { successToast, errorToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   useOOTBWorkflows,
   useWorkflowMetadata,
@@ -383,7 +391,7 @@ export default function ProjectSessionDetailPage({
             // Small delay between messages to avoid overwhelming the system
             await new Promise(resolve => setTimeout(resolve, 100));
           } catch (err) {
-            errorToast(err instanceof Error ? err.message : "Failed to send queued message");
+            toast.error(err instanceof Error ? err.message : "Failed to send queued message");
           }
         }
       };
@@ -447,12 +455,12 @@ export default function ProjectSessionDetailPage({
       }
 
       setRepoChanging(false);
-      successToast("Repository added successfully");
+      toast.success("Repository added successfully");
     },
     onError: (error: Error) => {
       setPendingRepo(null);
       setRepoChanging(false);
-      errorToast(error.message || "Failed to add repository");
+      toast.error(error.message || "Failed to add repository");
     },
   });
 
@@ -473,11 +481,11 @@ export default function ProjectSessionDetailPage({
         queryKey: sessionKeys.reposStatus(projectName, sessionName),
       });
       setRepoChanging(false);
-      successToast("Repository removed successfully");
+      toast.success("Repository removed successfully");
     },
     onError: (error: Error) => {
       setRepoChanging(false);
-      errorToast(error.message || "Failed to remove repository");
+      toast.error(error.message || "Failed to remove repository");
     },
   });
 
@@ -522,7 +530,7 @@ export default function ProjectSessionDetailPage({
       return response.json();
     },
     onSuccess: async (data) => {
-      successToast(`File "${data.filename}" uploaded successfully`);
+      toast.success(`File "${data.filename}" uploaded successfully`);
       // Refresh workspace to show uploaded file
       await refetchFileUploadsList();
       await refetchDirectoryFiles();
@@ -530,7 +538,7 @@ export default function ProjectSessionDetailPage({
       setUploadModalOpen(false);
     },
     onError: (error: Error) => {
-      errorToast(error.message || "Failed to upload file");
+      toast.error(error.message || "Failed to upload file");
     },
   });
 
@@ -552,13 +560,13 @@ export default function ProjectSessionDetailPage({
       return response.json();
     },
     onSuccess: async () => {
-      successToast("File removed successfully");
+      toast.success("File removed successfully");
       // Refresh file lists
       await refetchFileUploadsList();
       await refetchDirectoryFiles();
     },
     onError: (error: Error) => {
-      errorToast(error.message || "Failed to remove file");
+      toast.error(error.message || "Failed to remove file");
     },
   });
 
@@ -1276,9 +1284,9 @@ export default function ProjectSessionDetailPage({
     stopMutation.mutate(
       { projectName, sessionName },
       {
-        onSuccess: () => successToast("Session stopped successfully"),
+        onSuccess: () => toast.success("Session stopped successfully"),
         onError: (err) =>
-          errorToast(
+          toast.error(
             err instanceof Error ? err.message : "Failed to stop session",
           ),
       },
@@ -1304,7 +1312,7 @@ export default function ProjectSessionDetailPage({
           );
         },
         onError: (err) =>
-          errorToast(
+          toast.error(
             err instanceof Error ? err.message : "Failed to delete session",
           ),
       },
@@ -1316,10 +1324,10 @@ export default function ProjectSessionDetailPage({
       { projectName, parentSessionName: sessionName },
       {
         onSuccess: () => {
-          successToast("Session restarted successfully");
+          toast.success("Session restarted successfully");
         },
         onError: (err) =>
-          errorToast(
+          toast.error(
             err instanceof Error ? err.message : "Failed to restart session",
           ),
       },
@@ -1347,16 +1355,16 @@ export default function ProjectSessionDetailPage({
     try {
       await aguiSendMessage(finalMessage);
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to send message");
+      toast.error(err instanceof Error ? err.message : "Failed to send message");
     }
   };
 
   const handleCommandClick = async (slashCommand: string) => {
     try {
       await aguiSendMessage(slashCommand);
-      successToast(`Command ${slashCommand} sent`);
+      toast.success(`Command ${slashCommand} sent`);
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to send command");
+      toast.error(err instanceof Error ? err.message : "Failed to send command");
     }
   };
 
@@ -1381,18 +1389,31 @@ export default function ProjectSessionDetailPage({
       <div className="absolute inset-0 top-16 overflow-hidden bg-background flex flex-col">
         <div className="flex-shrink-0 bg-card border-b">
           <div className="container mx-auto px-6 py-4">
-            <Breadcrumbs
-              items={[
-                { label: "Workspaces", href: "/projects" },
-                { label: projectName, href: `/projects/${projectName}` },
-                {
-                  label: "Sessions",
-                  href: `/projects/${projectName}/sessions`,
-                },
-                { label: "Error" },
-              ]}
-              className="mb-4"
-            />
+            <Breadcrumb className="mb-4">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href="/projects">Workspaces</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href={`/projects/${projectName}`}>{projectName}</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href={`/projects/${projectName}/sessions`}>Sessions</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Error</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
         </div>
         <div className="flex-grow overflow-hidden">
@@ -1446,17 +1467,29 @@ export default function ProjectSessionDetailPage({
 
                 {/* Desktop: Full breadcrumb */}
                 <div className="hidden md:block">
-                  <Breadcrumbs
-                    items={[
-                      { label: "Workspaces", href: "/projects" },
-                      { label: projectName, href: `/projects/${projectName}` },
-                      {
-                        label: "Sessions",
-                        href: `/projects/${projectName}/sessions`,
-                      },
-                      {
-                        label: session.spec.displayName || session.metadata.name,
-                        rightIcon: (
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                          <Link href="/projects">Workspaces</Link>
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                          <Link href={`/projects/${projectName}`}>{projectName}</Link>
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                          <Link href={`/projects/${projectName}/sessions`}>Sessions</Link>
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage className="flex items-center gap-1.5">
+                          {session.spec.displayName || session.metadata.name}
                           <Badge
                             className={getPhaseColor(
                               session.status?.phase || "Pending",
@@ -1464,10 +1497,10 @@ export default function ProjectSessionDetailPage({
                           >
                             {session.status?.phase || "Pending"}
                           </Badge>
-                        ),
-                      },
-                    ]}
-                  />
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
                 </div>
 
                 {/* Kebab menu (both mobile and desktop) */}

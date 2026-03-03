@@ -27,7 +27,7 @@ import {
 
 import { useFeatureFlags } from "@/services/queries/use-feature-flags-admin";
 import * as featureFlagsApi from "@/services/api/feature-flags-admin";
-import { successToast, errorToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 type FeatureFlagsSectionProps = {
@@ -184,12 +184,12 @@ export function FeatureFlagsSection({ projectName }: FeatureFlagsSectionProps) {
       await Promise.all(promises);
 
       const totalChanges = changedFlags.length + resetFlags.length;
-      successToast(`${totalChanges} feature flag${totalChanges > 1 ? "s" : ""} updated`);
+      toast.success(`${totalChanges} feature flag${totalChanges > 1 ? "s" : ""} updated`);
 
       // Invalidate queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ["feature-flags", "list", projectName] });
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to save feature flags");
+      toast.error(err instanceof Error ? err.message : "Failed to save feature flags");
     } finally {
       setIsSaving(false);
     }
