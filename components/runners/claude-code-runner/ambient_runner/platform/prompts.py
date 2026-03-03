@@ -100,7 +100,7 @@ REFRESH_CREDENTIALS_TOOL_DESCRIPTION = (
 
 CORRECTION_DETECTION_INSTRUCTIONS = (
     "## CRITICAL: Automatic Correction Logging\n\n"
-    "**BEFORE acting on user feedback that changes something you already did or assumed, ALWAYS ask yourself: \"Is the user steering me away from a previous action or decision?\"**\n\n"
+    '**BEFORE acting on user feedback that changes something you already did or assumed, ALWAYS ask yourself: "Is the user steering me away from a previous action or decision?"**\n\n'
     "If YES → Call `log_correction` FIRST, then fix.\n\n"
     "**Rule: Any message that redirects, corrects, or changes your previous work or assumptions = log it. When in doubt, log it.**\n\n"
     "This includes quality issues, but also: redirections, preference changes, missed requirements, wrong scope, or any context that changes what you should have done. Do NOT treat these as simple new requests.\n"
@@ -110,6 +110,7 @@ CORRECTION_DETECTION_INSTRUCTIONS = (
 # ---------------------------------------------------------------------------
 # Prompt builder
 # ---------------------------------------------------------------------------
+
 
 def build_workspace_context_prompt(
     repos_cfg: list,
@@ -147,9 +148,7 @@ def build_workspace_context_prompt(
     file_uploads_path = Path(workspace_path) / "file-uploads"
     if file_uploads_path.exists() and file_uploads_path.is_dir():
         try:
-            files = sorted(
-                [f.name for f in file_uploads_path.iterdir() if f.is_file()]
-            )
+            files = sorted([f.name for f in file_uploads_path.iterdir() if f.is_file()])
             if files:
                 max_display = 10
                 if len(files) <= max_display:
@@ -170,9 +169,7 @@ def build_workspace_context_prompt(
         session_id = os.getenv("AGENTIC_SESSION_NAME", "").strip()
         feature_branch = f"ambient/{session_id}" if session_id else None
 
-        repo_names = [
-            repo.get("name", f"repo-{i}") for i, repo in enumerate(repos_cfg)
-        ]
+        repo_names = [repo.get("name", f"repo-{i}") for i, repo in enumerate(repos_cfg)]
         if len(repo_names) <= 5:
             prompt += (
                 f"**Repositories**: "
@@ -194,9 +191,7 @@ def build_workspace_context_prompt(
             prompt += "\n"
 
         # Git push instructions for auto-push repos
-        auto_push_repos = [
-            repo for repo in repos_cfg if repo.get("autoPush", False)
-        ]
+        auto_push_repos = [repo for repo in repos_cfg if repo.get("autoPush", False)]
         if auto_push_repos:
             if not feature_branch:
                 logger.warning(
@@ -222,17 +217,16 @@ def build_workspace_context_prompt(
 
     # Workflow instructions
     if ambient_config.get("systemPrompt"):
-        prompt += (
-            f"## Workflow Instructions\n"
-            f"{ambient_config['systemPrompt']}\n\n"
-        )
+        prompt += f"## Workflow Instructions\n{ambient_config['systemPrompt']}\n\n"
 
     # Rubric evaluation instructions
     prompt += _build_rubric_prompt_section(ambient_config)
 
     # Corrections feedback instructions (only when Langfuse is configured)
     langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "").strip().lower() in (
-        "1", "true", "yes"
+        "1",
+        "true",
+        "yes",
     )
     if langfuse_enabled:
         prompt += "## Corrections Feedback\n\n"
