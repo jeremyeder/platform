@@ -144,6 +144,8 @@ function DialogDescription({
   )
 }
 
+type DialogProps = React.ComponentProps<typeof DialogPrimitive.Root>;
+
 export {
   Dialog,
   DialogClose,
@@ -155,4 +157,6 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
-}
+};
+
+export type { DialogProps };

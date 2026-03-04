@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronsUpDown, Loader2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, ChevronsUpDown, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -35,11 +37,16 @@ import {
 } from "@/components/ui/select";
 import type { CreateAgenticSessionRequest } from "@/types/agentic-session";
 import { useCreateSession } from "@/services/queries/use-sessions";
+import { useRunnerTypes } from "@/services/queries/use-runner-types";
+import { DEFAULT_RUNNER_TYPE_ID } from "@/services/api/runner-types";
 import { useIntegrationsStatus } from "@/services/queries/use-integrations";
+import { useModels } from "@/services/queries/use-models";
 import { toast } from "sonner";
 
-const models = [
+// Keep in sync with components/manifests/base/models.json (available: true entries).
+const fallbackModels = [
   { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
   { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
   { value: "claude-opus-4-5", label: "Claude Opus 4.5" },
   { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
@@ -47,6 +54,7 @@ const models = [
 
 const formSchema = z.object({
   displayName: z.string().max(50).optional(),
+  runnerType: z.string().min(1, "Please select a runner type"),
   model: z.string().min(1, "Please select a model"),
   temperature: z.number().min(0).max(2),
   maxTokens: z.number().min(100).max(8000),
@@ -69,8 +77,15 @@ export function CreateSessionDialog({
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const createSessionMutation = useCreateSession();
+  const { data: runnerTypes, isLoading: runnerTypesLoading, isError: runnerTypesError, refetch: refetchRunnerTypes } = useRunnerTypes();
 
+  const { data: modelsData, isLoading: modelsLoading } = useModels(projectName, open);
   const { data: integrationsStatus } = useIntegrationsStatus();
+
+  const models = modelsData
+    ? modelsData.models.map((m) => ({ value: m.id, label: m.label }))
+    : fallbackModels;
+  const defaultModel = modelsData?.defaultModel ?? "claude-sonnet-4-5";
 
   const githubConfigured = integrationsStatus?.github?.active != null;
   const gitlabConfigured = integrationsStatus?.gitlab?.connected ?? false;
@@ -81,17 +96,43 @@ export function CreateSessionDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       displayName: "",
-      model: "claude-sonnet-4-5",
+      runnerType: DEFAULT_RUNNER_TYPE_ID,
+      model: defaultModel,
       temperature: 0.7,
       maxTokens: 4000,
       timeout: 300,
     },
   });
 
+  useEffect(() => {
+    if (modelsData?.defaultModel && !form.formState.dirtyFields.model) {
+      form.setValue("model", modelsData.defaultModel, { shouldDirty: false });
+    }
+  }, [modelsData?.defaultModel, form]);
+
+  const selectedRunnerType = form.watch("runnerType");
+
+  // Derive the available models from the selected runner type
+  const selectedRunner = useMemo(
+    () => runnerTypes?.find((rt) => rt.id === selectedRunnerType),
+    [runnerTypes, selectedRunnerType]
+  );
+  const availableModels = selectedRunner?.models ?? models;
+
+  const handleRunnerTypeChange = (value: string, onChange: (v: string) => void) => {
+    onChange(value);
+    const runner = runnerTypes?.find((rt) => rt.id === value);
+    if (runner) {
+      // Reset model to the runner's default
+      form.setValue("model", runner.defaultModel);
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
     if (!projectName) return;
 
     const request: CreateAgenticSessionRequest = {
+      runnerType: values.runnerType,
       llmSettings: {
         model: values.model,
         temperature: values.temperature,
@@ -166,6 +207,56 @@ export function CreateSessionDialog({
                 )}
               />
 
+              {/* Runner Type Selection */}
+              <FormField
+                control={form.control}
+                name="runnerType"
+                render={({ field }) => (
+                  <FormItem className="w-full">
+                    <FormLabel>Runner Type</FormLabel>
+                    {runnerTypesLoading ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : runnerTypesError ? (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="flex items-center justify-between">
+                          <span>Failed to load runner types.</span>
+                          <Button type="button" variant="outline" size="sm" onClick={() => refetchRunnerTypes()}>
+                            Retry
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Select
+                        onValueChange={(v) => handleRunnerTypeChange(v, field.onChange)}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a runner type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {runnerTypes?.map((rt) => (
+                            <SelectItem key={rt.id} value={rt.id}>
+                              {rt.displayName}
+                            </SelectItem>
+                          )) ?? (
+                            <SelectItem value={DEFAULT_RUNNER_TYPE_ID}>Claude Agent SDK</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {selectedRunner && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedRunner.description}
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Model Selection */}
               <FormField
                 control={form.control}
@@ -173,14 +264,20 @@ export function CreateSessionDialog({
                 render={({ field }) => (
                   <FormItem className="w-full">
                     <FormLabel>Model</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={modelsLoading}
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a model" />
+                          <SelectValue
+                            placeholder={modelsLoading ? "Loading models..." : "Select a model"}
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {models.map((m) => (
+                        {availableModels.map((m) => (
                           <SelectItem key={m.value} value={m.value}>
                             {m.label}
                           </SelectItem>
@@ -342,7 +439,7 @@ export function CreateSessionDialog({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createSessionMutation.isPending}>
+                <Button type="submit" disabled={createSessionMutation.isPending || runnerTypesLoading || runnerTypesError}>
                   {createSessionMutation.isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
