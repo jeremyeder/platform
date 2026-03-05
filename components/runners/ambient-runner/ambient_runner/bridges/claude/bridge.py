@@ -9,7 +9,6 @@ Owns the entire Claude session lifecycle:
 - Interrupt and graceful shutdown
 """
 
-import asyncio
 import logging
 import os
 import time
@@ -19,9 +18,9 @@ from ag_ui.core import BaseEvent, RunAgentInput
 from ag_ui_claude_sdk import ClaudeAgentAdapter
 
 from ambient_runner.bridge import (
-    CREDS_REFRESH_INTERVAL_SEC,
     FrameworkCapabilities,
     PlatformBridge,
+    _async_safe_manager_shutdown,
     setup_bridge_observability,
 )
 from ambient_runner.bridges.claude.session import SessionManager
@@ -43,13 +42,12 @@ class ClaudeBridge(PlatformBridge):
     """
 
     def __init__(self) -> None:
+        super().__init__()
         self._adapter: ClaudeAgentAdapter | None = None
         self._session_manager: SessionManager | None = None
         self._obs: Any = None
-        self._context: RunnerContext | None = None
 
         # Platform state (populated by _setup_platform)
-        self._ready: bool = False
         self._first_run: bool = True
         self._configured_model: str = ""
         self._cwd_path: str = ""
@@ -58,7 +56,6 @@ class ClaudeBridge(PlatformBridge):
         self._allowed_tools: list[str] = []
         self._system_prompt: dict = {}
         self._stderr_lines: list[str] = []
-        self._last_creds_refresh: float = 0.0
 
     # ------------------------------------------------------------------
     # PlatformBridge interface
@@ -89,14 +86,7 @@ class ClaudeBridge(PlatformBridge):
         """Full run lifecycle: lazy setup → adapter → session worker → tracing."""
         # 1. Lazy platform setup
         await self._ensure_ready()
-
-        # Refresh credentials if stale (tokens may have expired)
-        now = time.monotonic()
-        if now - self._last_creds_refresh > CREDS_REFRESH_INTERVAL_SEC:
-            from ambient_runner.platform.auth import populate_runtime_credentials
-
-            await populate_runtime_credentials(self._context)
-            self._last_creds_refresh = now
+        await self._refresh_credentials_if_stale()
 
         # 2. Ensure adapter exists
         self._ensure_adapter()
@@ -153,10 +143,6 @@ class ClaudeBridge(PlatformBridge):
     # Lifecycle methods
     # ------------------------------------------------------------------
 
-    def set_context(self, context: RunnerContext) -> None:
-        """Store the runner context (called from lifespan)."""
-        self._context = context
-
     async def shutdown(self) -> None:
         """Graceful shutdown: persist sessions, finalise tracing."""
         if self._session_manager:
@@ -179,22 +165,7 @@ class ClaudeBridge(PlatformBridge):
         if self._session_manager:
             manager = self._session_manager
             self._session_manager = None
-            try:
-                asyncio.get_running_loop()  # raises RuntimeError if no loop
-                future = asyncio.ensure_future(manager.shutdown())
-                future.add_done_callback(
-                    lambda f: logger.warning(
-                        "mark_dirty: session_manager shutdown error: %s", f.exception()
-                    )
-                    if f.exception()
-                    else None
-                )
-            except RuntimeError:
-                # No running loop — safe to block
-                try:
-                    asyncio.run(manager.shutdown())
-                except Exception as e:
-                    logger.warning("mark_dirty: session_manager shutdown error: %s", e)
+            _async_safe_manager_shutdown(manager)
         logger.info("ClaudeBridge: marked dirty — will reinitialise on next run")
 
     def get_error_context(self) -> str:
@@ -299,18 +270,6 @@ class ClaudeBridge(PlatformBridge):
     # ------------------------------------------------------------------
     # Private: platform setup (lazy, called on first run)
     # ------------------------------------------------------------------
-
-    async def _ensure_ready(self) -> None:
-        """Run one-time platform setup if not already done."""
-        if self._ready:
-            return
-        if not self._context:
-            raise RuntimeError("Context not set — call set_context() first")
-        await self._setup_platform()
-        self._ready = True
-        logger.info(
-            f"Platform ready — model: {self._configured_model}, cwd: {self._cwd_path}"
-        )
 
     async def _setup_platform(self) -> None:
         """Full platform setup: auth, workspace, MCP, observability."""

@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { useRunnerTypes } from "@/services/queries/use-runner-types";
+import { useRunnerTypesGlobal } from "@/services/queries/use-runner-types";
 import type { RunnerType } from "@/services/api/runner-types";
 
 function RuntimeStatusBadge() {
@@ -40,7 +40,7 @@ function RuntimeDetailPanel({ runtime }: { runtime: RunnerType }) {
             <div className="flex gap-2">
               <span className="text-muted-foreground">Required keys:</span>
               <span className="font-mono">
-                {(runtime.auth?.requiredSecretKeys ?? runtime.requiredSecretKeys ?? []).join(", ") || "None"}
+                {(runtime.auth?.requiredSecretKeys ?? []).join(", ") || "None"}
               </span>
             </div>
             <div className="flex gap-2">
@@ -56,17 +56,10 @@ function RuntimeDetailPanel({ runtime }: { runtime: RunnerType }) {
           </div>
         </div>
         <div>
-          <h4 className="text-sm font-medium mb-2">Models</h4>
-          <div className="flex flex-wrap gap-1">
-            {runtime.models.map((model) => (
-              <Badge key={model.value} variant="outline" className="text-xs">
-                {model.label}
-              </Badge>
-            ))}
-          </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            Default: <span className="font-mono">{runtime.defaultModel}</span>
-          </div>
+          <h4 className="text-sm font-medium mb-2">Provider</h4>
+          <Badge variant="outline" className="text-xs">
+            {runtime.provider}
+          </Badge>
         </div>
       </div>
       <div>
@@ -95,7 +88,7 @@ function LoadingSkeleton() {
 }
 
 export default function AdminRuntimesPage() {
-  const { data: runtimes, isLoading, isError, error, refetch } = useRunnerTypes();
+  const { data: runtimes, isLoading, isError, error, refetch } = useRunnerTypesGlobal();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const toggleExpanded = (id: string) => {
@@ -179,7 +172,7 @@ export default function AdminRuntimesPage() {
                       <TableHead className="w-8" />
                       <TableHead>Runtime</TableHead>
                       <TableHead className="hidden md:table-cell">Description</TableHead>
-                      <TableHead className="w-[80px] text-center">Models</TableHead>
+                      <TableHead className="w-[80px] text-center">Provider</TableHead>
                       <TableHead className="w-[200px]">Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -240,7 +233,7 @@ function RuntimeRow({
           {runtime.description || "\u2014"}
         </TableCell>
         <TableCell className="text-center">
-          <Badge variant="outline">{runtime.models.length}</Badge>
+          <Badge variant="outline">{runtime.provider}</Badge>
         </TableCell>
         <TableCell>
           <RuntimeStatusBadge />

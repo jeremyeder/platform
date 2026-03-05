@@ -23,8 +23,10 @@ Minimal implementation example::
             pass
 """
 
+import asyncio
 import logging
 import os
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Optional
@@ -41,6 +43,30 @@ CREDS_REFRESH_INTERVAL_SEC = 60
 
 # Minimum seconds between tool-level credential refresh calls.
 TOOL_REFRESH_MIN_INTERVAL_SEC = 30
+
+
+def _async_safe_manager_shutdown(manager: Any) -> None:
+    """Fire-and-forget async shutdown of a session manager from sync context.
+
+    Used by ``mark_dirty()`` implementations in all bridges. Handles both
+    cases: called from within a running event loop (schedules as a task)
+    and called outside any loop (blocks via ``asyncio.run``).
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(manager.shutdown())
+        task.add_done_callback(
+            lambda f: _bridge_logger.warning(
+                "mark_dirty: session_manager shutdown error: %s", f.exception()
+            )
+            if f.exception()
+            else None
+        )
+    except RuntimeError:
+        try:
+            asyncio.run(manager.shutdown())
+        except Exception as exc:
+            _bridge_logger.warning("mark_dirty: session_manager shutdown error: %s", exc)
 
 
 @dataclass
@@ -76,6 +102,11 @@ class PlatformBridge(ABC):
     - ``get_mcp_status()`` — returns MCP server diagnostics
     - ``get_error_context()`` — returns extra error info for failed runs
     """
+
+    def __init__(self) -> None:
+        self._context: Optional[RunnerContext] = None
+        self._ready: bool = False
+        self._last_creds_refresh: float = 0.0
 
     # ------------------------------------------------------------------
     # Required (abstract)
@@ -116,11 +147,39 @@ class PlatformBridge(ABC):
     # ------------------------------------------------------------------
 
     def set_context(self, context: RunnerContext) -> None:
-        """Store the runner context for later use.
+        """Store the runner context (called from lifespan before any requests)."""
+        self._context = context
 
-        Called by the platform lifespan before any requests are served.
-        Override to capture the context for use in ``run()``.
+    async def _refresh_credentials_if_stale(self) -> None:
+        """Refresh platform credentials if the refresh interval has elapsed.
+
+        Call this at the start of each ``run()`` to keep tokens fresh.
         """
+        now = time.monotonic()
+        if now - self._last_creds_refresh > CREDS_REFRESH_INTERVAL_SEC:
+            from ambient_runner.platform.auth import populate_runtime_credentials
+
+            await populate_runtime_credentials(self._context)
+            self._last_creds_refresh = now
+
+    async def _ensure_ready(self) -> None:
+        """Run one-time platform setup on the first ``run()`` call.
+
+        Calls ``_setup_platform()`` the first time, then sets ``self._ready``.
+        """
+        if self._ready:
+            return
+        if not self._context:
+            raise RuntimeError("Context not set — call set_context() first")
+        await self._setup_platform()
+        self._ready = True
+        _bridge_logger.info(
+            "Platform ready — model: %s",
+            getattr(self, "_configured_model", ""),
+        )
+
+    async def _setup_platform(self) -> None:
+        """Framework-specific platform setup. Override in each bridge."""
         pass
 
     async def shutdown(self) -> None:

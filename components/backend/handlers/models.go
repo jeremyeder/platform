@@ -54,14 +54,15 @@ func ListModelsForProject(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	namespace := sanitizeParam(c.Param("projectName"))
+	providerFilter := sanitizeParam(c.Query("provider"))
 
 	manifest, err := LoadManifest(ManifestPath())
 	if err != nil {
-		log.Printf("WARNING: failed to load model manifest: %v", err)
+		log.Printf("WARNING: failed to load model manifest from disk: %v", err)
 		manifest = cachedManifest.Load()
 		if manifest == nil {
-			log.Printf("WARNING: no cached manifest available, using hardcoded defaults")
-			c.JSON(http.StatusOK, defaultModelsResponse())
+			log.Printf("ERROR: no model manifest available (file unreadable, no cache)")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Model manifest unavailable"})
 			return
 		}
 	} else {
@@ -76,13 +77,27 @@ func ListModelsForProject(c *gin.Context) {
 		// Continue without overrides
 	}
 
-	var models []types.Model
+	// Resolve which model ID is the "default" for this request.
+	// When filtering by provider, use the provider-specific default.
+	effectiveDefault := manifest.DefaultModel
+	if providerFilter != "" {
+		if pd, ok := manifest.ProviderDefaults[providerFilter]; ok {
+			effectiveDefault = pd
+		}
+	}
+
+	models := make([]types.Model, 0)
 	for _, entry := range manifest.Models {
 		if !entry.Available {
 			continue
 		}
 
-		isDefault := entry.ID == manifest.DefaultModel
+		// Filter by provider if specified
+		if providerFilter != "" && entry.Provider != providerFilter {
+			continue
+		}
+
+		isDefault := entry.ID == effectiveDefault
 		flagName := fmt.Sprintf("model.%s.enabled", entry.ID)
 
 		// Default model is always included
@@ -103,15 +118,15 @@ func ListModelsForProject(c *gin.Context) {
 		}
 	}
 
+	responseDefault := effectiveDefault
 	if len(models) == 0 {
-		log.Printf("WARNING: no models passed filtering, using defaults")
-		c.JSON(http.StatusOK, defaultModelsResponse())
-		return
+		log.Printf("WARNING: no models passed filtering for provider=%q in namespace %s", providerFilter, namespace)
+		responseDefault = ""
 	}
 
 	c.JSON(http.StatusOK, types.ListModelsResponse{
 		Models:       models,
-		DefaultModel: manifest.DefaultModel,
+		DefaultModel: responseDefault,
 	})
 }
 
@@ -143,94 +158,68 @@ func LoadManifest(path string) (*types.ModelManifest, error) {
 	return &manifest, nil
 }
 
-// isModelAvailable checks if a model is available for session creation.
-//
-// Validation strategy:
-//  1. Check the agent registry — if the model is declared in the selected
-//     runner's model list, it's valid. This is the primary check for all runners.
-//  2. For models also in the models.json manifest (Claude models), additionally
-//     check feature-flag gating and workspace overrides.
-//  3. If the model is not found in either source, reject it.
-func isModelAvailable(ctx context.Context, k8sClient kubernetes.Interface, modelID, runnerTypeID, namespace string) bool {
+// isModelAvailable checks if a model is available for session creation in the
+// given workspace namespace. All models (Claude and Gemini) are validated
+// against models.json. Returns true if the model exists, is available, and
+// is enabled (checking workspace overrides first, then Unleash).
+// When requiredProvider is non-empty, the model's provider must match
+// (prevents using a Gemini model with a Claude runner, for example).
+// The default model always returns true. Fails open when no manifest has
+// ever been loaded (cold start).
+func isModelAvailable(ctx context.Context, k8sClient kubernetes.Interface, modelID, requiredProvider, namespace string) bool {
 	if modelID == "" {
 		return true // Empty model will use default
 	}
 
-	// 1. Check agent registry — runner-specific model validation
-	rt, err := GetRuntime(runnerTypeID)
-	if err == nil && len(rt.Models) > 0 {
-		found := false
-		for _, m := range rt.Models {
-			if m.Value == modelID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Printf("Model %q not in runner %q model list, rejecting", modelID, runnerTypeID)
-			return false
-		}
-		// Model is in the runner's list — now check if it also needs
-		// feature-flag gating via the manifest (applies to Claude models).
-	}
-
-	// 2. Check models.json manifest for feature-flag gating (if applicable)
 	manifest, err := LoadManifest(ManifestPath())
 	if err != nil {
-		log.Printf("WARNING: failed to load model manifest: %v", err)
+		log.Printf("WARNING: failed to load model manifest for validation: %v", err)
 		manifest = cachedManifest.Load()
+		if manifest == nil {
+			// When we know the runner's provider, reject unknown models rather
+			// than allowing a cross-provider mismatch through to the runner.
+			// Fail-open only when both manifest and registry are unavailable
+			// (requiredProvider == "") to avoid blocking cold starts.
+			if requiredProvider != "" {
+				log.Printf("WARNING: no manifest available, rejecting model %q (provider=%q)", modelID, requiredProvider)
+				return false
+			}
+			log.Printf("WARNING: no manifest or registry available, allowing model %q", modelID)
+			return true
+		}
 	} else {
 		cachedManifest.Store(manifest)
 	}
 
-	if manifest != nil {
-		// Default model is always available
-		if modelID == manifest.DefaultModel {
-			return true
-		}
-		for _, entry := range manifest.Models {
-			if entry.ID == modelID {
-				if !entry.Available {
-					return false
-				}
-				flagName := fmt.Sprintf("model.%s.enabled", entry.ID)
-				overrides, oErr := getWorkspaceOverrides(ctx, k8sClient, namespace)
-				if oErr != nil {
-					log.Printf("WARNING: failed to read workspace overrides for %s: %v", namespace, oErr)
-				}
-				return isModelEnabledWithOverrides(flagName, overrides)
+	for _, entry := range manifest.Models {
+		if entry.ID == modelID {
+			if !entry.Available {
+				return false
 			}
+			// Provider mismatch check applies to ALL models, including defaults
+			if requiredProvider != "" && entry.Provider != requiredProvider {
+				log.Printf("Model %q has provider %q but runner requires %q", modelID, entry.Provider, requiredProvider)
+				return false
+			}
+			// Default models (global and per-provider) are always enabled
+			// (skip feature flag check) but must still pass provider matching above
+			if modelID == manifest.DefaultModel {
+				return true
+			}
+			for provider, pd := range manifest.ProviderDefaults {
+				if modelID == pd && (requiredProvider == "" || provider == requiredProvider) {
+					return true
+				}
+			}
+			flagName := fmt.Sprintf("model.%s.enabled", entry.ID)
+			overrides, oErr := getWorkspaceOverrides(ctx, k8sClient, namespace)
+			if oErr != nil {
+				log.Printf("WARNING: failed to read workspace overrides for %s: %v", namespace, oErr)
+			}
+			return isModelEnabledWithOverrides(flagName, overrides)
 		}
 	}
 
-	// 3. If we validated via registry in step 1 (found=true), allow it.
-	//    Models not in the manifest skip feature-flag gating (e.g., Gemini models).
-	if rt != nil && len(rt.Models) > 0 {
-		return true // Already validated in step 1
-	}
-
-	// No manifest loaded and no registry available — fail-open on cold start
-	if manifest == nil {
-		log.Printf("WARNING: no manifest or registry available, allowing model %q", modelID)
-		return true
-	}
-
-	log.Printf("WARNING: model %q not found in manifest or agent registry, rejecting", modelID)
+	log.Printf("WARNING: model %q not found in manifest, rejecting", modelID)
 	return false
-}
-
-// defaultModelsResponse returns a hardcoded ListModelsResponse as a fallback
-// when the model manifest file is unavailable or malformed.
-// Keep in sync with components/manifests/base/models.json (available: true entries).
-func defaultModelsResponse() types.ListModelsResponse {
-	return types.ListModelsResponse{
-		DefaultModel: "claude-sonnet-4-5",
-		Models: []types.Model{
-			{ID: "claude-sonnet-4-5", Label: "Claude Sonnet 4.5", Provider: "anthropic", IsDefault: true},
-			{ID: "claude-sonnet-4-6", Label: "Claude Sonnet 4.6", Provider: "anthropic", IsDefault: false},
-			{ID: "claude-opus-4-6", Label: "Claude Opus 4.6", Provider: "anthropic", IsDefault: false},
-			{ID: "claude-opus-4-5", Label: "Claude Opus 4.5", Provider: "anthropic", IsDefault: false},
-			{ID: "claude-haiku-4-5", Label: "Claude Haiku 4.5", Provider: "anthropic", IsDefault: false},
-		},
-	}
 }
