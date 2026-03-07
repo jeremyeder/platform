@@ -348,8 +348,11 @@ export function useAGUIStream(options: UseAGUIStreamOptions): UseAGUIStreamRetur
           setIsRunActive(true)
         }
 
-        // Ensure we're connected to the thread stream to receive events
-        if (stateSnapshotRef.current.status !== 'connected') {
+        // Ensure we're connected to the thread stream to receive events.
+        // Skip if already connected or mid-handshake (connecting) to avoid
+        // tearing down an in-progress EventSource.
+        const { status } = stateSnapshotRef.current
+        if (status !== 'connected' && status !== 'connecting') {
           connect()
         }
       } catch (error) {
