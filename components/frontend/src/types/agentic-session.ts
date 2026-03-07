@@ -102,7 +102,7 @@ export type ToolUseMessages = {
 export type HierarchicalToolMessage = ToolUseMessages & {
 	children?: ToolUseMessages[];
 }
-	
+
 // -----------------------------
 // Message Types
 // -----------------------------
