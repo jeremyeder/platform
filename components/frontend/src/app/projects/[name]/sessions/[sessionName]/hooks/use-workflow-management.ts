@@ -87,12 +87,7 @@ export function useWorkflowManagement({
       setActiveWorkflow(workflow.id);
       setPendingWorkflow(null);
       sessionQueue.clearWorkflow();
-
-      // Wait for restart to complete (give runner time to clone and restart)
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
       onWorkflowActivated?.();
-
       setWorkflowActivating(false);
       return true;
     } catch (error) {

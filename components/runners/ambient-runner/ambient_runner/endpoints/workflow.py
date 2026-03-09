@@ -5,13 +5,9 @@ import logging
 import os
 import shutil
 import tempfile
-import uuid
 from pathlib import Path
 
-import aiohttp
 from fastapi import APIRouter, HTTPException, Request
-
-from ambient_runner.platform.config import load_ambient_config
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +19,7 @@ _workflow_change_lock = asyncio.Lock()
 
 @router.post("/workflow")
 async def change_workflow(request: Request):
-    """Change active workflow — triggers adapter reinit and greeting."""
+    """Change active workflow — triggers adapter reinit."""
     bridge = request.app.state.bridge
     context = bridge.context
     if not context:
@@ -46,7 +42,7 @@ async def change_workflow(request: Request):
             and current_branch == branch
             and current_path == path
         ):
-            logger.info("Workflow unchanged; skipping reinit and greeting")
+            logger.info("Workflow unchanged; skipping reinit")
             return {
                 "message": "Workflow already active",
                 "gitUrl": git_url,
@@ -66,6 +62,8 @@ async def change_workflow(request: Request):
         os.environ["ACTIVE_WORKFLOW_PATH"] = path
 
         bridge.mark_dirty()
+
+        logger.info("Workflow updated, adapter will reinitialize on next run")
 
         return {
             "message": "Workflow updated",
@@ -158,71 +156,3 @@ async def clone_workflow_at_runtime(
     finally:
         if temp_dir.exists():
             shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-async def _trigger_workflow_greeting(workflow_dir: str, context):
-    """Send the workflow's startupPrompt (from ambient.json) after a workflow change.
-
-    If the workflow has no startupPrompt, no greeting is sent.
-    """
-    try:
-        if not workflow_dir or not Path(workflow_dir).exists():
-            logger.info(f"Workflow dir '{workflow_dir}' not found, skipping greeting")
-            return
-
-        config = (
-            load_ambient_config(workflow_dir) if Path(workflow_dir).exists() else {}
-        )
-        startup_prompt = (config.get("startupPrompt") or "").strip()
-
-        if not startup_prompt:
-            logger.info(
-                f"Workflow at '{workflow_dir}' has no startupPrompt in ambient.json, "
-                f"skipping greeting"
-            )
-            return
-
-        backend_url = os.getenv("BACKEND_API_URL", "").rstrip("/")
-        project_name = os.getenv("AGENTIC_SESSION_NAMESPACE", "").strip()
-        session_id = context.session_id if context else "unknown"
-
-        if not backend_url or not project_name:
-            logger.error(
-                "Cannot trigger workflow greeting: BACKEND_API_URL or PROJECT_NAME not set"
-            )
-            return
-
-        url = f"{backend_url}/projects/{project_name}/agentic-sessions/{session_id}/agui/run"
-
-        payload = {
-            "threadId": session_id,
-            "runId": str(uuid.uuid4()),
-            "messages": [
-                {
-                    "id": str(uuid.uuid4()),
-                    "role": "user",
-                    "content": startup_prompt,
-                    "metadata": {
-                        "hidden": True,
-                        "autoSent": True,
-                        "source": "workflow_startup_prompt",
-                    },
-                }
-            ],
-        }
-
-        bot_token = os.getenv("BOT_TOKEN", "").strip()
-        headers = {"Content-Type": "application/json"}
-        if bot_token:
-            headers["Authorization"] = f"Bearer {bot_token}"
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers) as resp:
-                if resp.status == 200:
-                    logger.info(f"Workflow startupPrompt sent for '{workflow_dir}'")
-                else:
-                    logger.error(
-                        f"Workflow startupPrompt failed: {resp.status} - {await resp.text()}"
-                    )
-    except Exception as e:
-        logger.error(f"Failed to send workflow startupPrompt: {e}")

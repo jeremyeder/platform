@@ -50,6 +50,8 @@ export type WorkflowConfig = {
   branch: string;
   path?: string;
   enabled: boolean;
+  startupPrompt?: string;
+  greeting?: string;
 };
 
 export type WorkflowCommand = {

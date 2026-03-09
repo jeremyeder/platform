@@ -223,7 +223,7 @@ export function useAGUIStream(options: UseAGUIStreamOptions): UseAGUIStreamRetur
   // Send a message to start/continue the conversation
   // AG-UI server pattern: POST returns SSE stream directly
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, options?: { hidden?: boolean }) => {
       // Send to backend via run endpoint - this returns an SSE stream
       const runUrl = `/api/projects/${encodeURIComponent(projectName)}/agentic-sessions/${encodeURIComponent(sessionName)}/agui/run`
 
@@ -233,17 +233,20 @@ export function useAGUIStream(options: UseAGUIStreamOptions): UseAGUIStreamRetur
         content,
       }
 
-      // Add user message to state immediately for instant UI feedback.
-      const userMsgWithTimestamp = {
-        ...userMessage,
-        timestamp: new Date().toISOString(),
-      } as PlatformMessage
-      setState((prev) => ({
-        ...prev,
-        status: 'connected',
-        error: null,
-        messages: [...prev.messages, userMsgWithTimestamp],
-      }))
+      // Add user message to state immediately for instant UI feedback
+      // unless hidden (e.g. workflow startupPrompt instructions)
+      if (!options?.hidden) {
+        const userMsgWithTimestamp = {
+          ...userMessage,
+          timestamp: new Date().toISOString(),
+        } as PlatformMessage
+        setState((prev) => ({
+          ...prev,
+          status: 'connected',
+          error: null,
+          messages: [...prev.messages, userMsgWithTimestamp],
+        }))
+      }
 
       try {
         const response = await fetch(runUrl, {

@@ -188,6 +188,7 @@ export default function ProjectSessionDetailPage({
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
   const [customWorkflowDialogOpen, setCustomWorkflowDialogOpen] =
     useState(false);
+  const [instantGreeting, setInstantGreeting] = useState<string | null>(null);
 
   // Extract params
   useEffect(() => {
@@ -335,6 +336,9 @@ export default function ProjectSessionDetailPage({
     onWorkflowActivated: refetchSession,
   });
 
+  // Fetch OOTB workflows (must be above useEffects that reference it)
+  const { data: ootbWorkflows = [] } = useOOTBWorkflows(projectName);
+
   // Poll session status when workflow is queued
   useEffect(() => {
     if (!workflowManagement.queuedWorkflow) return;
@@ -356,20 +360,28 @@ export default function ProjectSessionDetailPage({
   useEffect(() => {
     const phase = session?.status?.phase;
     const queuedWorkflow = workflowManagement.queuedWorkflow;
-    if (phase === "Running" && queuedWorkflow && !queuedWorkflow.activatedAt) {
-      // Session is now running, activate the queued workflow
-      workflowManagement.activateWorkflow({
+    if (phase === "Running" && queuedWorkflow && !queuedWorkflow.activatedAt && ootbWorkflows.length > 0) {
+      // Session is now running and OOTB workflows are loaded, activate the queued workflow
+      // Look up the full workflow config (including startupPrompt) from the OOTB list
+      const fullWorkflow = ootbWorkflows.find(w => w.id === queuedWorkflow.id);
+      const workflowConfig = {
         id: queuedWorkflow.id,
-        name: "Queued workflow",
-        description: "",
+        name: fullWorkflow?.name || "Queued workflow",
+        description: fullWorkflow?.description || "",
         gitUrl: queuedWorkflow.gitUrl,
         branch: queuedWorkflow.branch,
         path: queuedWorkflow.path,
         enabled: true,
-      }, phase);
+        startupPrompt: fullWorkflow?.startupPrompt,
+        greeting: fullWorkflow?.greeting,
+      };
+      if (workflowConfig.greeting) {
+        setInstantGreeting(workflowConfig.greeting);
+      }
+      workflowManagement.activateWorkflow(workflowConfig, phase);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.status?.phase, workflowManagement.queuedWorkflow]);
+  }, [session?.status?.phase, workflowManagement.queuedWorkflow, ootbWorkflows]);
 
   // Poll session status when messages are queued
   useEffect(() => {
@@ -583,8 +595,6 @@ export default function ProjectSessionDetailPage({
     },
   });
 
-  // Fetch OOTB workflows
-  const { data: ootbWorkflows = [] } = useOOTBWorkflows(projectName);
 
   // Fetch workflow metadata
   const { data: workflowMetadata } = useWorkflowMetadata(
@@ -760,13 +770,17 @@ export default function ProjectSessionDetailPage({
   }, [session, workflowManagement.activeWorkflow, reposStatus]);
 
   // Workflow change handler
-  const handleWorkflowChange = (value: string) => {
+  const handleWorkflowChange = async (value: string) => {
     const workflow = workflowManagement.handleWorkflowChange(value, ootbWorkflows, () =>
       setCustomWorkflowDialogOpen(true),
     );
     // Automatically trigger activation with the workflow directly (avoids state timing issues)
     if (workflow) {
-      workflowManagement.activateWorkflow(workflow, session?.status?.phase);
+      // Display greeting with streaming effect (no LLM round-trip needed)
+      if (workflow.greeting) {
+        setInstantGreeting(workflow.greeting);
+      }
+      await workflowManagement.activateWorkflow(workflow, session?.status?.phase);
     }
   };
 
@@ -2641,6 +2655,7 @@ export default function ProjectSessionDetailPage({
                             hasRealMessages={hasRealMessages}
                             onLoadWorkflow={() => setCustomWorkflowDialogOpen(true)}
                             selectedWorkflow={workflowManagement.selectedWorkflow}
+                            workflowGreeting={instantGreeting}
                           />
                         }
                       />
@@ -2719,6 +2734,7 @@ export default function ProjectSessionDetailPage({
                               hasRealMessages={hasRealMessages}
                               onLoadWorkflow={() => setCustomWorkflowDialogOpen(true)}
                               selectedWorkflow={workflowManagement.selectedWorkflow}
+                              workflowGreeting={instantGreeting}
                             />
                           }
                         />
