@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Gift } from "lucide-react";
+import { Gift, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -25,21 +25,15 @@ function groupByProject(
 }
 
 export function NotificationCenter() {
-  const { notifications, unreadCount, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markAllRead, dismissNotification } =
+    useNotifications();
   const [open, setOpen] = useState(false);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (nextOpen) {
-      markAllRead();
-    }
-  };
 
   const grouped = groupByProject(notifications);
   const projectNames = Object.keys(grouped).sort();
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -62,11 +56,16 @@ export function NotificationCenter() {
         <div className="sticky top-0 z-10 border-b bg-popover px-4 py-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Notifications</h3>
-            {notifications.length > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {notifications.length}{" "}
-                {notifications.length === 1 ? "session" : "sessions"}
-              </span>
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={markAllRead}
+              >
+                <CheckCheck className="h-3 w-3" />
+                Mark all read
+              </Button>
             )}
           </div>
         </div>
@@ -86,6 +85,9 @@ export function NotificationCenter() {
                     <NotificationCard
                       key={notification.sessionUid}
                       notification={notification}
+                      onDismiss={() =>
+                        dismissNotification(notification.sessionUid)
+                      }
                     />
                   ))}
                 </div>

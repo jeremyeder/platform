@@ -21,9 +21,10 @@ const typeLabels: Record<NotificationType, string> = {
 
 type NotificationCardProps = {
   notification: Notification;
+  onDismiss?: () => void;
 };
 
-export function NotificationCard({ notification }: NotificationCardProps) {
+export function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
   const { sessionName, displayName, projectName, type, timestamp } =
     notification;
 
@@ -35,6 +36,7 @@ export function NotificationCard({ notification }: NotificationCardProps) {
   return (
     <Link
       href={`/projects/${encodeURIComponent(projectName)}/sessions/${encodeURIComponent(sessionName)}`}
+      onClick={onDismiss}
       className={cn(
         "block rounded-md border-l-4 bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/80",
         borderColors[type]

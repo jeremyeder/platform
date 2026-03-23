@@ -78,7 +78,7 @@ describe("NotificationCenter", () => {
     expect(screen.getByText("No notifications")).toBeDefined();
   });
 
-  it("calls markAllRead when popover opens", () => {
+  it("shows Mark all read button when there are unread notifications", () => {
     mockUseNotifications.mockReturnValue({
       notifications: [
         {
@@ -97,6 +97,9 @@ describe("NotificationCenter", () => {
 
     render(<NotificationCenter />);
     fireEvent.click(screen.getByLabelText("Notifications"));
+    const markAllReadButton = screen.getByText("Mark all read");
+    expect(markAllReadButton).toBeDefined();
+    fireEvent.click(markAllReadButton);
     expect(mockMarkAllRead).toHaveBeenCalled();
   });
 
