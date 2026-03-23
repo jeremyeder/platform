@@ -52,7 +52,7 @@ describe("useNotifications", () => {
   });
 
   it("returns empty notifications when no projects", async () => {
-    mockUseProjects.mockReturnValue({ data: [] } as ReturnType<typeof useProjects>);
+    mockUseProjects.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useProjects>);
 
     const { result } = renderHook(() => useNotifications(), {
       wrapper: createWrapper(),
@@ -65,7 +65,7 @@ describe("useNotifications", () => {
   it("detects waiting_input sessions", async () => {
     mockUseProjects.mockReturnValue({
       data: [{ name: "proj-1" }],
-    } as ReturnType<typeof useProjects>);
+    } as unknown as ReturnType<typeof useProjects>);
 
     mockListSessions.mockResolvedValue({
       items: [
@@ -95,7 +95,7 @@ describe("useNotifications", () => {
   it("detects recently completed sessions", async () => {
     mockUseProjects.mockReturnValue({
       data: [{ name: "proj-1" }],
-    } as ReturnType<typeof useProjects>);
+    } as unknown as ReturnType<typeof useProjects>);
 
     mockListSessions.mockResolvedValue({
       items: [
@@ -126,7 +126,7 @@ describe("useNotifications", () => {
   it("ignores old completed sessions", async () => {
     mockUseProjects.mockReturnValue({
       data: [{ name: "proj-1" }],
-    } as ReturnType<typeof useProjects>);
+    } as unknown as ReturnType<typeof useProjects>);
 
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     mockListSessions.mockResolvedValue({
@@ -153,7 +153,7 @@ describe("useNotifications", () => {
   it("markAllRead clears unread count", async () => {
     mockUseProjects.mockReturnValue({
       data: [{ name: "proj-1" }],
-    } as ReturnType<typeof useProjects>);
+    } as unknown as ReturnType<typeof useProjects>);
 
     mockListSessions.mockResolvedValue({
       items: [
