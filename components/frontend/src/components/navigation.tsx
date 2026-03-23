@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Plug, LogOut, Menu, Home, MessageSquare } from "lucide-react";
 import { useVersion } from "@/services/queries/use-version";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { NotificationCenter } from "@/components/notifications/notification-center";
 
 type NavigationProps = {
   feedbackUrl?: string;
@@ -143,6 +144,7 @@ export function Navigation({ feedbackUrl }: NavigationProps) {
               <Plug className="w-4 h-4 mr-1" />
               Integrations
             </Button>
+            <NotificationCenter />
             <DropdownMenu>
               <DropdownMenuTrigger className="outline-none">
                 <UserBubble />
@@ -155,8 +157,9 @@ export function Navigation({ feedbackUrl }: NavigationProps) {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          {/* Mobile: only show theme toggle (user menu items are in the drawer) */}
+          {/* Mobile: only show theme toggle + notifications (user menu items are in the drawer) */}
           <div className="flex md:hidden items-center gap-2">
+            <NotificationCenter />
             <ThemeToggle />
           </div>
         </div>

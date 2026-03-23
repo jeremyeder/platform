@@ -5,6 +5,7 @@ import { useParams, useRouter, usePathname } from "next/navigation";
 import { PanelLeft, Plug, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useVersion } from "@/services/queries/use-version";
+import { NotificationCenter } from "@/components/notifications/notification-center";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -124,6 +125,7 @@ export default function ProjectLayout({
                   <Plug className="w-4 h-4 mr-1" />
                   Integrations
                 </Button>
+                <NotificationCenter />
                 <DropdownMenu>
                   <DropdownMenuTrigger className="outline-none">
                     <UserBubble />
