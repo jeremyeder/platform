@@ -2428,11 +2428,19 @@ func regenerateRunnerToken(sessionNamespace, sessionName string, session *unstru
 
 	// Create ServiceAccount
 	saName := fmt.Sprintf("ambient-session-%s", sessionName)
+	saAnnotations := map[string]string{}
+	// Propagate the session owner's userId so the backend middleware
+	// (resolveServiceAccountFromToken) can resolve the human identity
+	// when this SA creates child sessions or calls credential APIs.
+	if ownerUID, found, _ := unstructured.NestedString(session.Object, "spec", "userContext", "userId"); found && ownerUID != "" {
+		saAnnotations["ambient-code.io/created-by-user-id"] = ownerUID
+	}
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: v1.ObjectMeta{
 			Name:            saName,
 			Namespace:       sessionNamespace,
 			Labels:          map[string]string{"app": "ambient-runner"},
+			Annotations:     saAnnotations,
 			OwnerReferences: []v1.OwnerReference{ownerRef},
 		},
 	}
@@ -2441,6 +2449,29 @@ func regenerateRunnerToken(sessionNamespace, sessionName string, session *unstru
 			return fmt.Errorf("create SA: %w", err)
 		}
 		log.Printf("[TokenProvision] ServiceAccount %s already exists", saName)
+		// Ensure the annotation is present on pre-existing SAs (e.g., restarts).
+		// Skip the update if the annotation is already correct.
+		if len(saAnnotations) > 0 {
+			existingSA, getErr := config.K8sClient.CoreV1().ServiceAccounts(sessionNamespace).Get(context.TODO(), saName, v1.GetOptions{})
+			if getErr != nil {
+				return fmt.Errorf("get SA for annotation update: %w", getErr)
+			}
+			needsUpdate := false
+			if existingSA.Annotations == nil {
+				existingSA.Annotations = make(map[string]string)
+			}
+			for k, v := range saAnnotations {
+				if existingSA.Annotations[k] != v {
+					existingSA.Annotations[k] = v
+					needsUpdate = true
+				}
+			}
+			if needsUpdate {
+				if _, updErr := config.K8sClient.CoreV1().ServiceAccounts(sessionNamespace).Update(context.TODO(), existingSA, v1.UpdateOptions{}); updErr != nil {
+					return fmt.Errorf("update SA annotations: %w", updErr)
+				}
+			}
+		}
 	}
 
 	// Create Role with least-privilege permissions
