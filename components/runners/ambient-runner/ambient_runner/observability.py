@@ -462,6 +462,8 @@ class ObservabilityManager:
             )
 
         except Exception as e:
+            self._current_turn_generation = None
+            self._current_turn_ctx = None
             self._exit_turn_propagate_ctx()
             logging.error(f"Langfuse: Failed to start turn: {e}", exc_info=True)
 
@@ -1141,8 +1143,16 @@ class ObservabilityManager:
                     logging.warning(f"Failed to close tool span {tool_id}: {e}")
             self._tool_spans.clear()
 
-            # Emit session-level summary metrics before closing context
-            self._emit_session_summary()
+            # Emit session-level summary metrics before closing context.
+            # Re-enter propagation so the span gets userId/sessionId/tags
+            # even when finalize() runs in a different async task than initialize().
+            if self._propagate_args:
+                from langfuse import propagate_attributes
+
+                with propagate_attributes(**self._propagate_args):
+                    self._emit_session_summary()
+            else:
+                self._emit_session_summary()
 
             # Exit propagate_attributes context.
             # The context uses OpenTelemetry contextvars internally.  When
