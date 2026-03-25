@@ -95,7 +95,6 @@ jobs:
           # Use Python for reliable changelog generation with author grouping
           python3 -c "
           import subprocess, sys
-          from collections import OrderedDict
 
           latest_tag = sys.argv[1]
           new_tag = sys.argv[2]
@@ -108,7 +107,11 @@ jobs:
               capture_output=True, text=True
           )
 
-          commits_by_author = OrderedDict()
+          if result.returncode != 0:
+              print(f'Error: git log failed: {result.stderr}', file=sys.stderr)
+              sys.exit(1)
+
+          commits_by_author = {}
           count_by_author = {}
 
           for line in result.stdout.strip().split('\n'):
@@ -126,17 +129,21 @@ jobs:
           first_timers = []
           if latest_tag != 'v0.0.0':
               # Resolve tag to ISO date — --before requires a date, not a ref name
-              tag_date = subprocess.run(
+              tag_date_result = subprocess.run(
                   ['git', 'log', '-1', '--format=%ci', latest_tag],
                   capture_output=True, text=True
-              ).stdout.strip()
-              for author, _ in sorted_authors:
-                  r = subprocess.run(
-                      ['git', 'log', '--all', f'--before={tag_date}', f'--author={author}', '--oneline', '-1'],
+              )
+              tag_date = tag_date_result.stdout.strip()
+              if tag_date_result.returncode == 0 and tag_date:
+                  # Get all unique author names before the tag date in one call
+                  prior = subprocess.run(
+                      ['git', 'log', '--all', f'--before={tag_date}', '--format=%an'],
                       capture_output=True, text=True
                   )
-                  if not r.stdout.strip():
-                      first_timers.append(author)
+                  prior_authors = set(prior.stdout.strip().split('\n')) if prior.stdout.strip() else set()
+                  for author, _ in sorted_authors:
+                      if author not in prior_authors:
+                          first_timers.append(author)
 
           print(f'# Release {new_tag}')
           print()
