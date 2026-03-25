@@ -140,7 +140,9 @@ jobs:
                       ['git', 'log', '--all', f'--before={tag_date}', '--format=%an'],
                       capture_output=True, text=True
                   )
-                  prior_authors = set(prior.stdout.strip().split('\n')) if prior.stdout.strip() else set()
+                  prior_authors = set()
+                  if prior.returncode == 0 and prior.stdout.strip():
+                      prior_authors = set(prior.stdout.strip().split('\n'))
                   for author, _ in sorted_authors:
                       if author not in prior_authors:
                           first_timers.append(author)
