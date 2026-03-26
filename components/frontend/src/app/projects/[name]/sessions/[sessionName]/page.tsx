@@ -19,7 +19,7 @@ import { SessionHeader } from "./session-header";
 
 // Extracted components
 import { AddContextModal } from "./components/modals/add-context-modal";
-import { UploadFileModal } from "./components/modals/upload-file-modal";
+import { UploadFileModal, type UploadFileSource } from "./components/modals/upload-file-modal";
 import { CustomWorkflowDialog } from "./components/modals/custom-workflow-dialog";
 import { ManageRemoteDialog } from "./components/modals/manage-remote-dialog";
 
@@ -448,12 +448,59 @@ export default function ProjectSessionDetailPage({
 
   // File upload mutation
   const uploadFileMutation = useMutation({
-    mutationFn: async (source: {
-      type: "local" | "url";
-      file?: File;
-      url?: string;
-      filename?: string;
-    }) => {
+    mutationFn: async (source: UploadFileSource) => {
+      if (source.type === "folder" && source.files && source.files.length > 0) {
+        // Upload each file in the folder sequentially, preserving directory structure
+        const successes: string[] = [];
+        const failures: string[] = [];
+        for (const { file, relativePath } of source.files) {
+          // Split relativePath into directory + filename
+          const parts = relativePath.split("/");
+          const filename = parts.pop() || file.name;
+          const subpath = parts.join("/");
+
+          const formData = new FormData();
+          formData.append("type", "local");
+          formData.append("file", file);
+          formData.append("filename", filename);
+          if (subpath) {
+            formData.append("subpath", subpath);
+          }
+
+          try {
+            const response = await fetch(
+              `/api/projects/${projectName}/agentic-sessions/${sessionName}/workspace/upload`,
+              {
+                method: "POST",
+                body: formData,
+              },
+            );
+
+            if (!response.ok) {
+              const error = await response.json();
+              failures.push(error.error || relativePath);
+            } else {
+              successes.push(relativePath);
+            }
+          } catch {
+            failures.push(relativePath);
+          }
+        }
+
+        const folderName = source.files[0].relativePath.split("/")[0];
+
+        if (failures.length > 0 && successes.length === 0) {
+          throw new Error(`All ${failures.length} files failed to upload`);
+        }
+        if (failures.length > 0) {
+          throw new Error(
+            `${successes.length} of ${source.files.length} files uploaded; ${failures.length} failed: ${failures.join(", ")}`,
+          );
+        }
+
+        return { filename: folderName, fileCount: successes.length };
+      }
+
       const formData = new FormData();
       formData.append("type", source.type);
 
@@ -481,15 +528,23 @@ export default function ProjectSessionDetailPage({
       return response.json();
     },
     onSuccess: async (data) => {
-      toast.success(`File "${data.filename}" uploaded successfully`);
-      // Refresh workspace to show uploaded file
+      if (data.fileCount) {
+        toast.success(`Folder "${data.filename}" uploaded (${data.fileCount} files)`);
+      } else {
+        toast.success(`File "${data.filename}" uploaded successfully`);
+      }
+      // Refresh workspace to show uploaded file(s)
       await refetchFileUploadsList();
       await refetchDirectoryFiles();
       await refetchArtifactsFiles();
       setUploadModalOpen(false);
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
       toast.error(error.message || "Failed to upload file");
+      // Refresh workspace so partially uploaded files are visible
+      await refetchFileUploadsList();
+      await refetchDirectoryFiles();
+      await refetchArtifactsFiles();
     },
   });
 
@@ -899,6 +954,23 @@ export default function ProjectSessionDetailPage({
             },
           });
         }
+      } else if (msg.role === "reasoning" || msg.role === "developer") {
+        // ReasoningMessage (role="reasoning") per AG-UI spec carries thinking content.
+        // Also handle legacy DeveloperMessage (role="developer") from older sessions.
+        const thinkingText = typeof msg.content === 'string' ? msg.content : '';
+        if (thinkingText) {
+          result.push({
+            type: "agent_message",
+            id: msg.id,
+            content: {
+              type: "reasoning_block",
+              thinking: thinkingText,
+              signature: "",
+            },
+            model: "claude",
+            timestamp,
+          });
+        }
       } else if (msg.role === "system") {
         result.push({
           type: "system_message",
@@ -1048,7 +1120,32 @@ export default function ProjectSessionDetailPage({
       }
     }
 
-    return result;
+    // Deduplicate reasoning blocks. Old sessions may have both REASONING_*
+    // streaming events (no messageId) and a MESSAGES_SNAPSHOT developer/reasoning
+    // message with a different ID — producing two identical thinking blocks.
+    // Use msg.id for keyed messages; fall back to content matching only for
+    // unkeyed (anonymous) duplicates within the same reasoning text.
+    const seenReasoningIds = new Set<string>();
+    const seenAnonThinking = new Set<string>();
+    const deduped = result.filter(msg => {
+      const content = 'content' in msg && typeof msg.content === 'object' && msg.content !== null ? msg.content : null;
+      if (content && 'thinking' in content && content.type === 'reasoning_block') {
+        const msgId = 'id' in msg ? (msg as { id: string }).id : '';
+        if (msgId) {
+          // Keyed message — deduplicate by ID
+          if (seenReasoningIds.has(msgId)) return false;
+          seenReasoningIds.add(msgId);
+        } else {
+          // Anonymous legacy message — deduplicate by content
+          const key = (content as { thinking: string }).thinking;
+          if (seenAnonThinking.has(key)) return false;
+          seenAnonThinking.add(key);
+        }
+      }
+      return true;
+    });
+
+    return deduped;
   }, [
     aguiState.messages,
     aguiState.currentToolCall,   // Needed in Phase A to avoid orphaned-child promotion
