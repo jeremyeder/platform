@@ -9,7 +9,7 @@ import { RecentUpdatesDialog } from "@/components/recent-updates-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Plug, LogOut, Menu, Home, MessageSquare } from "lucide-react";
+import { Plug, LogOut, Menu, Home, MessageSquare, Github } from "lucide-react";
 import { useVersion } from "@/services/queries/use-version";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -135,6 +135,15 @@ export function Navigation({ feedbackUrl }: NavigationProps) {
               </a>
             )}
             <RecentUpdatesDialog />
+            <a
+              href="https://github.com/ambient-code/platform"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="View on GitHub"
+            >
+              <Github className="h-5 w-5" />
+            </a>
             <ThemeToggle />
             <Button
               variant="ghost"
