@@ -57,7 +57,7 @@ func TestGenerateState_Uniqueness(t *testing.T) {
 }
 
 func TestBuildAuthorizeURL(t *testing.T) {
-	result := BuildAuthorizeURL(
+	result, err := BuildAuthorizeURL(
 		"https://auth.example.com/authorize",
 		"my-client",
 		"http://localhost:12345/callback",
@@ -65,6 +65,9 @@ func TestBuildAuthorizeURL(t *testing.T) {
 		"test-challenge",
 		"openid email",
 	)
+	if err != nil {
+		t.Fatalf("BuildAuthorizeURL() error: %v", err)
+	}
 
 	parsed, err := url.Parse(result)
 	if err != nil {
@@ -94,17 +97,20 @@ func TestBuildAuthorizeURL(t *testing.T) {
 }
 
 func TestDiscoverEndpoints(t *testing.T) {
+	var serverURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/.well-known/openid-configuration" {
 			http.NotFound(w, r)
 			return
 		}
 		json.NewEncoder(w).Encode(OIDCConfig{
+			Issuer:                serverURL,
 			AuthorizationEndpoint: "https://auth.example.com/authorize",
 			TokenEndpoint:         "https://auth.example.com/token",
 		})
 	}))
 	defer server.Close()
+	serverURL = server.URL
 
 	cfg, err := DiscoverEndpoints(server.URL)
 	if err != nil {
@@ -120,16 +126,37 @@ func TestDiscoverEndpoints(t *testing.T) {
 }
 
 func TestDiscoverEndpoints_MissingEndpoints(t *testing.T) {
+	var serverURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"issuer": "https://example.com"})
+		json.NewEncoder(w).Encode(map[string]string{"issuer": serverURL})
 	}))
 	defer server.Close()
+	serverURL = server.URL
 
 	_, err := DiscoverEndpoints(server.URL)
 	if err == nil {
 		t.Fatal("expected error for missing endpoints")
 	}
 	if !strings.Contains(err.Error(), "missing required endpoints") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestDiscoverEndpoints_IssuerMismatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{
+			"issuer":                 "https://wrong-issuer.example.com",
+			"authorization_endpoint": "https://auth.example.com/authorize",
+			"token_endpoint":         "https://auth.example.com/token",
+		})
+	}))
+	defer server.Close()
+
+	_, err := DiscoverEndpoints(server.URL)
+	if err == nil {
+		t.Fatal("expected error for issuer mismatch")
+	}
+	if !strings.Contains(err.Error(), "issuer mismatch") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

@@ -18,6 +18,7 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // OIDCConfig holds the endpoints discovered from the issuer.
 type OIDCConfig struct {
+	Issuer                string `json:"issuer"`
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
 	TokenEndpoint         string `json:"token_endpoint"`
 }
@@ -57,8 +58,23 @@ func DiscoverEndpoints(issuerURL string) (*OIDCConfig, error) {
 		return nil, fmt.Errorf("parse OIDC discovery: %w", err)
 	}
 
+	expectedIssuer := strings.TrimRight(issuerURL, "/")
+	if cfg.Issuer != expectedIssuer {
+		return nil, fmt.Errorf("OIDC discovery issuer mismatch: got %q, want %q", cfg.Issuer, expectedIssuer)
+	}
+
 	if cfg.AuthorizationEndpoint == "" || cfg.TokenEndpoint == "" {
 		return nil, fmt.Errorf("OIDC discovery missing required endpoints")
+	}
+
+	for name, raw := range map[string]string{
+		"authorization_endpoint": cfg.AuthorizationEndpoint,
+		"token_endpoint":         cfg.TokenEndpoint,
+	} {
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("OIDC discovery returned invalid %s: %q", name, raw)
+		}
 	}
 
 	return &cfg, nil
@@ -88,17 +104,21 @@ func GenerateState() (string, error) {
 }
 
 // BuildAuthorizeURL constructs the full authorization URL with all required parameters.
-func BuildAuthorizeURL(authEndpoint, clientID, redirectURI, state, codeChallenge, scopes string) string {
-	params := url.Values{
-		"response_type":         {"code"},
-		"client_id":             {clientID},
-		"redirect_uri":          {redirectURI},
-		"state":                 {state},
-		"code_challenge":        {codeChallenge},
-		"code_challenge_method": {"S256"},
-		"scope":                 {scopes},
+func BuildAuthorizeURL(authEndpoint, clientID, redirectURI, state, codeChallenge, scopes string) (string, error) {
+	u, err := url.Parse(authEndpoint)
+	if err != nil {
+		return "", fmt.Errorf("parse authorization endpoint: %w", err)
 	}
-	return authEndpoint + "?" + params.Encode()
+	params := u.Query()
+	params.Set("response_type", "code")
+	params.Set("client_id", clientID)
+	params.Set("redirect_uri", redirectURI)
+	params.Set("state", state)
+	params.Set("code_challenge", codeChallenge)
+	params.Set("code_challenge_method", "S256")
+	params.Set("scope", scopes)
+	u.RawQuery = params.Encode()
+	return u.String(), nil
 }
 
 // ExchangeCode exchanges an authorization code for tokens.

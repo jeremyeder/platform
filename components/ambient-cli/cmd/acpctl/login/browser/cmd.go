@@ -87,7 +87,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	defer cleanup()
 
 	redirectURI := "http://" + addr + "/callback"
-	authorizeURL := oauth.BuildAuthorizeURL(
+	authorizeURL, err := oauth.BuildAuthorizeURL(
 		oidcCfg.AuthorizationEndpoint,
 		clientID,
 		redirectURI,
@@ -95,6 +95,9 @@ func run(cmd *cobra.Command, _ []string) error {
 		pkce.Challenge,
 		args.scopes,
 	)
+	if err != nil {
+		return fmt.Errorf("build authorize URL: %w", err)
+	}
 
 	if err := oauth.OpenBrowser(authorizeURL); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Could not open browser: %v\n", err)
@@ -147,7 +150,11 @@ func run(cmd *cobra.Command, _ []string) error {
 				manualCh <- oauth.CallbackResult{Err: fmt.Errorf("URL missing 'code' parameter")}
 				return
 			}
-			if pastedState != "" && pastedState != state {
+			if pastedState == "" {
+				manualCh <- oauth.CallbackResult{Err: fmt.Errorf("URL missing 'state' parameter")}
+				return
+			}
+			if pastedState != state {
 				manualCh <- oauth.CallbackResult{Err: fmt.Errorf("state mismatch in pasted URL")}
 				return
 			}
@@ -181,7 +188,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	cfg.AccessToken = tokenResp.AccessToken
-	cfg.RefreshToken = tokenResp.RefreshToken
+	cfg.RefreshToken = ""
 	cfg.IssuerURL = issuerURL
 	cfg.ClientID = clientID
 
