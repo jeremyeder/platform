@@ -13,6 +13,9 @@ import (
 type Config struct {
 	APIUrl            string `json:"api_url,omitempty"`
 	AccessToken       string `json:"access_token,omitempty"`
+	RefreshToken      string `json:"refresh_token,omitempty"`
+	IssuerURL         string `json:"issuer_url,omitempty"`
+	ClientID          string `json:"client_id,omitempty"`
 	Project           string `json:"project,omitempty"`
 	Pager             string `json:"pager,omitempty"`            // TODO: Wire pager support into output commands (e.g. pipe through less)
 	RequestTimeout    int    `json:"request_timeout,omitempty"`  // Request timeout in seconds
@@ -80,6 +83,21 @@ func Save(cfg *Config) error {
 
 func (c *Config) ClearToken() {
 	c.AccessToken = ""
+	c.RefreshToken = ""
+}
+
+func (c *Config) GetIssuerURL() string {
+	if env := os.Getenv("AMBIENT_ISSUER_URL"); env != "" {
+		return env
+	}
+	return c.IssuerURL
+}
+
+func (c *Config) GetClientID() string {
+	if env := os.Getenv("AMBIENT_CLIENT_ID"); env != "" {
+		return env
+	}
+	return c.ClientID
 }
 
 func (c *Config) GetAPIUrl() string {

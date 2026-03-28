@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/ambient-code/platform/components/ambient-cli/cmd/acpctl/login/browser"
 	"github.com/ambient-code/platform/components/ambient-cli/pkg/config"
 	"github.com/spf13/cobra"
 )
@@ -27,15 +28,17 @@ var Cmd = &cobra.Command{
 
 func init() {
 	flags := Cmd.Flags()
-	flags.StringVar(&args.token, "token", "", "Access token (required)")
+	flags.StringVar(&args.token, "token", "", "Access token (required when not using 'browser' subcommand)")
 	flags.StringVar(&args.url, "url", "", "API server URL (default: http://localhost:8000)")
 	flags.StringVar(&args.project, "project", "", "Default project name")
 	flags.BoolVar(&args.insecureSkipVerify, "insecure-skip-tls-verify", false, "Skip TLS certificate verification (insecure)")
+
+	Cmd.AddCommand(browser.Cmd)
 }
 
 func run(cmd *cobra.Command, positional []string) error {
 	if args.token == "" {
-		return fmt.Errorf("--token is required")
+		return fmt.Errorf("--token is required (or use 'acpctl login browser' for browser-based OAuth login)")
 	}
 
 	cfg, err := config.Load()
