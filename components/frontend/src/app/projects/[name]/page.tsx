@@ -98,12 +98,12 @@ export default function ProjectDetailsPage() {
   const { data: project, isLoading: projectLoading } = useProject(projectName);
 
   // Initialize active section from query parameter or default to 'sessions'
-  const initialSection = (searchParams.get('section') as Section) || 'sessions';
+  const initialSection = (searchParams?.get('section') as Section) || 'sessions';
   const [activeSection, setActiveSection] = useState<Section>(initialSection);
 
   // Update active section when query parameter changes
   useEffect(() => {
-    const sectionParam = searchParams.get('section') as Section;
+    const sectionParam = searchParams?.get('section') as Section;
     if (sectionParam && ['sessions', 'schedules', 'sharing', 'keys', 'settings'].includes(sectionParam)) {
       setActiveSection(sectionParam);
     }
