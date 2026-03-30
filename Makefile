@@ -66,9 +66,9 @@ STATE_SYNC_IMAGE ?= vteam_state_sync:$(IMAGE_TAG)
 PUBLIC_API_IMAGE ?= vteam_public_api:$(IMAGE_TAG)
 API_SERVER_IMAGE ?= vteam_api_server:$(IMAGE_TAG)
 
-# Podman prefixes image names with localhost/ — kind load needs to use the same
-# name so containerd can match the image reference used in the deployment spec
-KIND_IMAGE_PREFIX := $(if $(filter podman,$(CONTAINER_ENGINE)),localhost/,)
+# kind-local overlay always references localhost/vteam_* images.
+# Podman produces this prefix natively; for Docker we tag before loading.
+KIND_IMAGE_PREFIX := localhost/
 
 # Load local developer config (KIND_HOST, etc.) — gitignored, set once per machine
 -include .env.local
@@ -955,6 +955,7 @@ _kind-load-images: ## Internal: Load images into kind cluster
 			$(CONTAINER_ENGINE) exec -i $(KIND_CLUSTER_NAME)-control-plane \
 			ctr --namespace=k8s.io images import -; \
 		else \
+			docker tag $$img $(KIND_IMAGE_PREFIX)$$img 2>/dev/null || true; \
 			kind load docker-image $(KIND_IMAGE_PREFIX)$$img --name $(KIND_CLUSTER_NAME); \
 		fi; \
 	done
