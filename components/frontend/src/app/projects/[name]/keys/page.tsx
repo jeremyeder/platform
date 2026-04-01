@@ -21,19 +21,7 @@ import { useKeys, useCreateKey, useDeleteKey } from '@/services/queries';
 import { toast } from 'sonner';
 import type { CreateKeyRequest } from '@/services/api/keys';
 import { ROLE_DEFINITIONS } from '@/lib/role-colors';
-
-// Kubernetes TokenRequest does not support non-expiring tokens — the API server
-// silently caps ExpirationSeconds. Max is 1 year; "No expiration" is not offered
-// because K8s will expire the token regardless.
-const EXPIRATION_OPTIONS = [
-  { value: '86400', label: '1 day' },
-  { value: '604800', label: '7 days' },
-  { value: '2592000', label: '30 days' },
-  { value: '7776000', label: '90 days' },
-  { value: '31536000', label: '1 year' },
-] as const;
-
-const DEFAULT_EXPIRATION = '7776000'; // 90 days
+import { EXPIRATION_OPTIONS, DEFAULT_EXPIRATION } from '@/lib/constants';
 
 export default function ProjectKeysPage() {
   const params = useParams();
