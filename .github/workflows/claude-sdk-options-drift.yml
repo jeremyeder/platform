@@ -1,0 +1,134 @@
+name: Claude SDK Options Drift Check
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC
+  workflow_dispatch:
+
+concurrency:
+  group: claude-sdk-options-drift
+  cancel-in-progress: true
+
+jobs:
+  check-drift:
+    name: Check SDK Options Drift
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install claude-agent-sdk
+        run: pip install claude-agent-sdk
+
+      - name: Extract current SDK options
+        run: |
+          python3 -c "
+          import json
+          try:
+              from claude_agent_sdk import ClaudeAgentOptions
+              # Pydantic model — extract fields from model_fields
+              if hasattr(ClaudeAgentOptions, 'model_fields'):
+                  fields = {}
+                  for name, field_info in ClaudeAgentOptions.model_fields.items():
+                      annotation = str(field_info.annotation) if field_info.annotation else 'unknown'
+                      fields[name] = {
+                          'type': annotation,
+                          'required': field_info.is_required(),
+                      }
+              else:
+                  # Fallback: inspect __init__ signature
+                  import inspect
+                  sig = inspect.signature(ClaudeAgentOptions.__init__)
+                  fields = {}
+                  for name, param in sig.parameters.items():
+                      if name == 'self':
+                          continue
+                      fields[name] = {
+                          'type': str(param.annotation) if param.annotation != inspect.Parameter.empty else 'unknown',
+                          'required': param.default == inspect.Parameter.empty,
+                      }
+              print(json.dumps(fields, indent=2, sort_keys=True))
+          except ImportError:
+              print('{}')
+              import sys
+              print('WARNING: claude-agent-sdk not found', file=sys.stderr)
+              sys.exit(1)
+          " > /tmp/current-sdk-options.json
+
+      - name: Compare with manifest
+        id: check
+        run: |
+          python3 -c "
+          import json, sys
+
+          manifest_path = 'components/runners/ambient-runner/sdk-options-manifest.json'
+          try:
+              with open(manifest_path) as f:
+                  manifest = json.load(f)
+          except FileNotFoundError:
+              print('No manifest file found — creating initial manifest')
+              sys.exit(1)
+
+          with open('/tmp/current-sdk-options.json') as f:
+              current = json.load(f)
+
+          manifest_keys = set(manifest.get('options', {}).keys())
+          current_keys = set(current.keys())
+
+          new_keys = sorted(current_keys - manifest_keys)
+          removed_keys = sorted(manifest_keys - current_keys)
+
+          if new_keys or removed_keys:
+              if new_keys:
+                  print(f'New options: {new_keys}')
+              if removed_keys:
+                  print(f'Removed options: {removed_keys}')
+              sys.exit(1)
+
+          print('No drift detected')
+          " || echo "drift=true" >> "$GITHUB_OUTPUT"
+
+      - name: Update manifest and create PR
+        if: steps.check.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Build updated manifest
+          python3 -c "
+          import json, datetime
+
+          with open('/tmp/current-sdk-options.json') as f:
+              options = json.load(f)
+
+          manifest = {
+              'description': 'Canonical list of Claude Agent SDK ClaudeAgentOptions fields',
+              'generatedFrom': 'claude-agent-sdk (PyPI)',
+              'generatedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'options': options,
+          }
+
+          with open('components/runners/ambient-runner/sdk-options-manifest.json', 'w') as f:
+              json.dump(manifest, f, indent=2, sort_keys=True)
+              f.write('\n')
+          "
+
+          BRANCH="auto/sdk-options-update-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add components/runners/ambient-runner/sdk-options-manifest.json
+          git commit -m "chore: update Claude SDK options manifest"
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --title "chore: update Claude SDK options manifest" \
+            --body "Auto-detected changes in ClaudeAgentOptions fields from claude-agent-sdk on PyPI. The advanced-sdk-options UI component may need updating to expose new options." \
+            --label "amber:auto-fix"
