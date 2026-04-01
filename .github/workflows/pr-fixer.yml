@@ -84,7 +84,7 @@ jobs:
             [{"url": "https://github.com/${{ github.repository }}", "branch": "main"}]
           workflow: >-
             {"gitUrl": "https://github.com/ambient-code/workflows", "branch": "main", "path": "internal-workflows/pr-fixer"}
-          model: claude-sonnet-4-5
+          model: claude-opus-4-6
           wait: 'true'
           timeout: '25'
 
@@ -194,7 +194,7 @@ jobs:
             [{"url": "https://github.com/${{ github.repository }}", "branch": "main"}]
           workflow: >-
             {"gitUrl": "https://github.com/ambient-code/workflows", "branch": "main", "path": "internal-workflows/pr-fixer"}
-          model: claude-sonnet-4-5
+          model: claude-opus-4-6
           wait: 'false'
 
       - name: Session summary
