@@ -154,6 +154,7 @@ async def handle_tool_result_block(
     """
     tool_use_id = getattr(block, "tool_use_id", None)
     content = getattr(block, "content", None)
+    is_error = getattr(block, "is_error", None)
 
     # Parse tool result content for frontend rendering
     # Claude SDK tools return: [{"type": "text", "text": "{json_data}"}]
@@ -191,6 +192,8 @@ async def handle_tool_result_block(
             thread_id=thread_id,
             run_id=run_id,
             tool_call_id=tool_use_id,
+            result=result_str if not is_error else None,
+            error=result_str if is_error else None,
             timestamp=now_ms(),
         )
 
@@ -232,15 +235,15 @@ async def handle_thinking_block(
     # Emit standard AG-UI reasoning events
     if thinking_text:
         ts = now_ms()
-        yield ReasoningStartEvent(thread_id=thread_id, run_id=run_id, timestamp=ts)
+        yield ReasoningStartEvent(threadId=thread_id, runId=run_id, timestamp=ts)
         yield ReasoningMessageStartEvent(
-            thread_id=thread_id, run_id=run_id, timestamp=ts
+            threadId=thread_id, runId=run_id, timestamp=ts
         )
         yield ReasoningMessageContentEvent(
-            thread_id=thread_id, run_id=run_id, delta=thinking_text
+            threadId=thread_id, runId=run_id, delta=thinking_text
         )
-        yield ReasoningMessageEndEvent(thread_id=thread_id, run_id=run_id, timestamp=ts)
-        yield ReasoningEndEvent(thread_id=thread_id, run_id=run_id, timestamp=ts)
+        yield ReasoningMessageEndEvent(threadId=thread_id, runId=run_id, timestamp=ts)
+        yield ReasoningEndEvent(threadId=thread_id, runId=run_id, timestamp=ts)
 
     # Also emit signature as custom event if present
     if signature:
