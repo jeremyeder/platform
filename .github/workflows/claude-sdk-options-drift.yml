@@ -74,7 +74,7 @@ jobs:
               with open(manifest_path) as f:
                   manifest = json.load(f)
           except FileNotFoundError:
-              print('No manifest file found — creating initial manifest')
+              print('No manifest file found — will create initial manifest')
               sys.exit(1)
 
           with open('/tmp/current-sdk-options.json') as f:
