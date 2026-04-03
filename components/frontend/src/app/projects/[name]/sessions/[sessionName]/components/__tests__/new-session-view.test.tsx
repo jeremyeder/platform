@@ -132,7 +132,7 @@ describe('NewSessionView', () => {
   });
 
   it('includes branch and autoPush in onCreateSession when repo is added with branch', () => {
-    render(<NewSessionView {...defaultProps} />);
+    render(<NewSessionView {...defaultProps} />, { wrapper: createWrapper() });
 
     // Add a repo with branch via the mock AddContextModal
     fireEvent.click(screen.getByTestId('add-repo-with-branch-btn'));
@@ -153,7 +153,7 @@ describe('NewSessionView', () => {
   });
 
   it('omits branch from repos when no branch is specified', () => {
-    render(<NewSessionView {...defaultProps} />);
+    render(<NewSessionView {...defaultProps} />, { wrapper: createWrapper() });
 
     // Add a repo without branch
     fireEvent.click(screen.getByTestId('add-repo-btn'));
@@ -169,7 +169,7 @@ describe('NewSessionView', () => {
   });
 
   it('removes a pending repo badge when the X button is clicked', () => {
-    render(<NewSessionView {...defaultProps} />);
+    render(<NewSessionView {...defaultProps} />, { wrapper: createWrapper() });
 
     // Add a repo via the always-rendered mock AddContextModal
     fireEvent.click(screen.getByTestId('add-repo-btn'));

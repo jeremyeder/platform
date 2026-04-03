@@ -22,9 +22,13 @@ import {
 import { ChevronsUpDown, Settings, Code, X } from "lucide-react";
 import type { SdkOptions } from "@/types/api/sessions";
 
-// Keep in sync with the runner's default allowed_tools in
-// components/runners/ambient-runner/ambient_runner/bridges/claude/bridge.py
-const DEFAULT_TOOLS = [
+// Tools blocked by default. Empty = all tools allowed.
+// Add tools here only if they should be off unless explicitly enabled.
+const BLOCKED_TOOLS: string[] = [];
+
+// Well-known tools shown as toggles in the UI.
+// This is purely for display — tools not listed here are still allowed.
+const KNOWN_TOOLS = [
   "Read",
   "Write",
   "Edit",
@@ -35,10 +39,11 @@ const DEFAULT_TOOLS = [
   "WebSearch",
   "WebFetch",
   "NotebookEdit",
+  "Skill",
+  "Agent",
   "TodoRead",
   "TodoWrite",
-  "Agent",
-] as const;
+];
 
 type ModelOption = {
   id: string;
@@ -67,10 +72,8 @@ export function AdvancedSdkOptions({
   };
 
   const toggleTool = (tool: string) => {
-    // If allowed_tools is undefined, the runner uses its own defaults.
-    // When the user first toggles a tool, we start from the full DEFAULT_TOOLS list
-    // so toggling off one tool removes it from an explicit allowlist.
-    const current = value.allowed_tools ?? [...DEFAULT_TOOLS];
+    // On first interaction, initialize from known tools minus any blocked
+    const current = value.allowed_tools ?? KNOWN_TOOLS.filter((t) => !BLOCKED_TOOLS.includes(t));
     const next = current.includes(tool)
       ? current.filter((t) => t !== tool)
       : [...current, tool];
@@ -95,7 +98,7 @@ export function AdvancedSdkOptions({
   const addCustomTool = () => {
     const trimmed = customToolInput.trim();
     if (!trimmed) return;
-    const current = value.allowed_tools ?? [];
+    const current = value.allowed_tools ?? KNOWN_TOOLS.filter((t) => !BLOCKED_TOOLS.includes(t));
     if (!current.includes(trimmed)) {
       update({ allowed_tools: [...current, trimmed] });
     }
@@ -366,23 +369,27 @@ export function AdvancedSdkOptions({
             Allowed Tools
           </legend>
           <div className="grid grid-cols-3 gap-2">
-            {DEFAULT_TOOLS.map((tool) => (
+            {KNOWN_TOOLS.map((tool) => (
               <div
                 key={tool}
                 className="flex items-center justify-between px-2 py-1.5 border rounded text-xs"
               >
                 <span>{tool}</span>
                 <Switch
-                  checked={(value.allowed_tools ?? []).includes(tool)}
+                  checked={
+                    value.allowed_tools === undefined
+                      ? !BLOCKED_TOOLS.includes(tool)
+                      : value.allowed_tools.includes(tool)
+                  }
                   onCheckedChange={() => toggleTool(tool)}
                   className="scale-75"
                 />
               </div>
             ))}
           </div>
-          {/* Custom tools not in default list */}
+          {/* Custom tools not in known list */}
           {(value.allowed_tools ?? [])
-            .filter((t) => !(DEFAULT_TOOLS as readonly string[]).includes(t))
+            .filter((t) => !KNOWN_TOOLS.includes(t))
             .map((tool) => (
               <Badge key={tool} variant="secondary" className="gap-1 mr-1">
                 {tool}
