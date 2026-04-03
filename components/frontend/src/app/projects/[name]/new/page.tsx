@@ -25,7 +25,7 @@ export default function NewSessionPage() {
       runner: string;
       model: string;
       workflow?: string;
-      repos?: Array<{ url: string }>;
+      repos?: Array<{ url: string; branch?: string; autoPush?: boolean }>;
       sdkOptions?: SdkOptions;
     }) => {
       const workflowConfig = config.workflow === "custom" && customWorkflow
@@ -52,7 +52,11 @@ export default function NewSessionPage() {
               : {}),
             ...(config.repos && config.repos.length > 0
               ? {
-                  repos: config.repos.map((r) => ({ url: r.url })),
+                  repos: config.repos.map((r) => ({
+                    url: r.url,
+                    ...(r.branch ? { branch: r.branch } : {}),
+                    ...(r.autoPush !== undefined ? { autoPush: r.autoPush } : {}),
+                  })),
                 }
               : {}),
             ...(config.sdkOptions ? { sdkOptions: config.sdkOptions } : {}),

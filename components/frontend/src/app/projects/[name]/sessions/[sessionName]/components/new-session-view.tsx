@@ -32,6 +32,8 @@ import type { SdkOptions } from "@/types/api/sessions";
 type PendingRepo = {
   url: string;
   name: string;
+  branch?: string;
+  autoPush?: boolean;
 };
 
 type NewSessionViewProps = {
@@ -41,7 +43,7 @@ type NewSessionViewProps = {
     runner: string;
     model: string;
     workflow?: string;
-    repos?: Array<{ url: string }>;
+    repos?: Array<{ url: string; branch?: string; autoPush?: boolean }>;
     sdkOptions?: SdkOptions;
   }) => void;
   ootbWorkflows: WorkflowConfig[];
@@ -117,10 +119,20 @@ export function NewSessionView({
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const addPendingRepo = (url: string) => {
+  // Auto-resize the textarea as the user types.
+  // `field-sizing: content` (used by the base Textarea) only works in Chrome;
+  // this JS fallback ensures the same behaviour in Firefox and Safari.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [prompt]);
+
+  const addPendingRepo = (url: string, branch?: string, autoPush?: boolean) => {
     if (pendingRepos.some((r) => r.url === url)) return;
     const name = url.replace(/\/+$/, "").split("/").pop()?.replace(/\.git$/, "") || url;
-    setPendingRepos((prev) => [...prev, { url, name }]);
+    setPendingRepos((prev) => [...prev, { url, name, branch: branch || undefined, autoPush }]);
   };
 
   const removePendingRepo = (url: string) => {
@@ -142,7 +154,7 @@ export function NewSessionView({
       runner: selectedRunner,
       model: selectedModel,
       workflow: hasWorkflow ? selectedWorkflow : undefined,
-      repos: pendingRepos.length > 0 ? pendingRepos.map((r) => ({ url: r.url })) : undefined,
+      repos: pendingRepos.length > 0 ? pendingRepos.map((r) => ({ url: r.url, branch: r.branch, autoPush: r.autoPush })) : undefined,
       sdkOptions: hasOptions ? sdkOptions : undefined,
     });
   }, [prompt, selectedRunner, selectedModel, selectedWorkflow, pendingRepos, sdkOptions, onCreateSession]);
@@ -160,7 +172,7 @@ export function NewSessionView({
   };
 
   return (
-    <div className="h-full flex items-center justify-center p-8">
+    <div className="min-h-full flex items-center justify-center p-8">
       <div className="w-full max-w-2xl space-y-4">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -183,7 +195,7 @@ export function NewSessionView({
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Describe what you'd like to work on..."
-            className="min-h-[100px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pb-12"
+            className="min-h-[100px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pb-12 overflow-y-hidden"
           />
           <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-2">
             <div className="flex items-center gap-1">
@@ -255,10 +267,17 @@ export function NewSessionView({
                     <Badge variant="secondary" className="gap-1">
                       <GitBranch className="h-3 w-3" />
                       {repo.name}
-                      <X
-                        className="h-3 w-3 cursor-pointer"
-                        onClick={() => removePendingRepo(repo.url)}
-                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removePendingRepo(repo.url);
+                        }}
+                        aria-label={`Remove ${repo.name}`}
+                        className="cursor-pointer"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>{repo.url}</TooltipContent>
@@ -273,8 +292,8 @@ export function NewSessionView({
       <AddContextModal
         open={contextModalOpen}
         onOpenChange={setContextModalOpen}
-        onAddRepository={async (url) => {
-          addPendingRepo(url);
+        onAddRepository={async (url, branch, autoPush) => {
+          addPendingRepo(url, branch, autoPush);
           setContextModalOpen(false);
         }}
       />

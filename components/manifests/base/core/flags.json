@@ -21,6 +21,26 @@
       ]
     },
     {
+      "name": "scheduled-session.reuse.enabled",
+      "description": "Enable reuse last session option for scheduled sessions",
+      "tags": [
+        {
+          "type": "scope",
+          "value": "workspace"
+        }
+      ]
+    },
+    {
+      "name": "jira-write",
+      "description": "Allow Jira MCP server to perform write operations in new sessions",
+      "tags": [
+        {
+          "type": "scope",
+          "value": "workspace"
+        }
+      ]
+    },
+    {
       "name": "advanced-sdk-options",
       "description": "Show Advanced SDK Options in session creation UI",
       "tags": [

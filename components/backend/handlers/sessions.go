@@ -24,6 +24,7 @@ import (
 	"ambient-code-backend/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	authnv1 "k8s.io/api/authentication/v1"
 	authzv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -127,15 +128,60 @@ var allowedSdkOptionKeys = map[string]bool{
 	"system_prompt":             true,
 }
 
-// filterSdkOptions returns only the allowed keys from the input map.
-func filterSdkOptions(opts map[string]interface{}) map[string]interface{} {
+// filterSdkOptions returns only the allowed keys from the input map, validating value types.
+// Returns the filtered map and an error if any value has an invalid type.
+func filterSdkOptions(opts map[string]interface{}) (map[string]interface{}, error) {
 	filtered := make(map[string]interface{}, len(opts))
 	for k, v := range opts {
-		if allowedSdkOptionKeys[k] {
-			filtered[k] = v
+		if !allowedSdkOptionKeys[k] {
+			continue
+		}
+		if err := validateSdkOptionValue(k, v); err != nil {
+			return nil, fmt.Errorf("invalid value for %q: %w", k, err)
+		}
+		filtered[k] = v
+	}
+	return filtered, nil
+}
+
+// validateSdkOptionValue checks that the value type is appropriate for the given SDK option key.
+func validateSdkOptionValue(key string, value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch key {
+	case "model", "permission_mode", "fallback_model", "system_prompt", "output_format":
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("expected string, got %T", value)
+		}
+	case "temperature", "max_budget_usd":
+		switch value.(type) {
+		case float64, float32, int, int64:
+		default:
+			return fmt.Errorf("expected number, got %T", value)
+		}
+	case "max_tokens", "max_thinking_tokens", "max_turns":
+		switch value.(type) {
+		case float64, int, int64:
+		default:
+			return fmt.Errorf("expected integer, got %T", value)
+		}
+	case "include_partial_messages", "enable_file_checkpointing", "strict_mcp_config":
+		if _, ok := value.(bool); !ok {
+			return fmt.Errorf("expected boolean, got %T", value)
+		}
+	case "betas", "allowed_tools":
+		arr, ok := value.([]interface{})
+		if !ok {
+			return fmt.Errorf("expected array, got %T", value)
+		}
+		for i, item := range arr {
+			if _, ok := item.(string); !ok {
+				return fmt.Errorf("expected string at index %d, got %T", i, item)
+			}
 		}
 	}
-	return filtered
+	return nil
 }
 
 func parseSpec(spec map[string]interface{}) types.AgenticSessionSpec {
@@ -728,10 +774,9 @@ func CreateSession(c *gin.Context) {
 		timeout = *req.Timeout
 	}
 
-	// Generate unique name (timestamp-based)
+	// Generate unique name (UUID-based)
 	// Note: Runner will create branch as "ambient/{session-name}"
-	timestamp := time.Now().Unix()
-	name := fmt.Sprintf("session-%d", timestamp)
+	name := fmt.Sprintf("session-%s", uuid.New().String())
 
 	// Create the custom resource
 	// Metadata
@@ -795,9 +840,22 @@ func CreateSession(c *gin.Context) {
 		envVars[k] = v
 	}
 
+	// When the jira-write flag is enabled for this workspace, let the Jira MCP server write.
+	overrides, err := getWorkspaceOverrides(c.Request.Context(), reqK8s, project)
+	if err != nil {
+		log.Printf("WARNING: failed to read feature flag overrides for project %s: %v", project, err)
+	}
+	if isRunnerEnabledWithOverrides("jira-write", overrides) {
+		envVars["JIRA_READ_ONLY_MODE"] = "false"
+	}
+
 	// Serialize sdkOptions as JSON into SDK_OPTIONS env var (filtered to allowed keys only)
 	if len(req.SdkOptions) > 0 {
-		filtered := filterSdkOptions(req.SdkOptions)
+		filtered, filterErr := filterSdkOptions(req.SdkOptions)
+		if filterErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid sdkOptions: %v", filterErr)})
+			return
+		}
 		if len(filtered) > 0 {
 			sdkOptsJSON, err := json.Marshal(filtered)
 			if err != nil {
@@ -872,45 +930,71 @@ func CreateSession(c *gin.Context) {
 	}
 
 	// Add userContext from authenticated caller identity.
-	// Prefer forwarded headers (OAuth proxy); fall back to SelfSubjectReview
+	// When a parent session is specified, inherit the parent's userContext so that
+	// child sessions created by a runner service account retain the original user's
+	// identity (and therefore their credentials, e.g. GitHub tokens).
+	// Otherwise, prefer forwarded headers (OAuth proxy); fall back to SelfSubjectReview
 	// for headless/API callers that authenticate directly with a bearer token.
 	{
-		uidVal, _ := c.Get("userID")
-		uid, _ := uidVal.(string)
-		uid = strings.TrimSpace(uid)
+		var parentUserContext map[string]interface{}
 
-		if uid == "" {
-			if resolved, err := resolveTokenIdentity(c.Request.Context(), reqK8s); err == nil {
-				uid = strings.ReplaceAll(resolved, ":", "-")
-				log.Printf("Resolved token identity via SelfSubjectReview: %s", uid)
+		// If this is a child session, fetch the parent's userContext
+		if req.ParentSessionID != "" {
+			gvr := GetAgenticSessionV1Alpha1Resource()
+			parentObj, err := k8sDyn.Resource(gvr).Namespace(project).Get(context.TODO(), req.ParentSessionID, v1.GetOptions{})
+			if err != nil {
+				log.Printf("Warning: could not fetch parent session %s/%s to inherit userContext: %v", project, req.ParentSessionID, err)
 			} else {
-				log.Printf("Could not resolve token identity: %v", err)
+				uc, found, _ := unstructured.NestedMap(parentObj.Object, "spec", "userContext")
+				if found && len(uc) > 0 {
+					parentUserContext = uc
+					log.Printf("Inheriting userContext from parent session %s (userId=%v)", req.ParentSessionID, uc["userId"])
+				}
 			}
 		}
 
-		if uid != "" {
-			displayName := ""
-			if v, ok := c.Get("userName"); ok {
-				if s, ok2 := v.(string); ok2 {
-					displayName = s
+		if parentUserContext != nil {
+			// Use the parent's userContext directly
+			session["spec"].(map[string]interface{})["userContext"] = parentUserContext
+		} else {
+			// No parent — resolve from the caller's identity
+			uidVal, _ := c.Get("userID")
+			uid, _ := uidVal.(string)
+			uid = strings.TrimSpace(uid)
+
+			if uid == "" {
+				if resolved, err := resolveTokenIdentity(c.Request.Context(), reqK8s); err == nil {
+					uid = strings.ReplaceAll(resolved, ":", "-")
+					log.Printf("Resolved token identity via SelfSubjectReview: %s", uid)
+				} else {
+					log.Printf("Could not resolve token identity: %v", err)
 				}
 			}
-			groups := []string{}
-			if v, ok := c.Get("userGroups"); ok {
-				if gg, ok2 := v.([]string); ok2 {
-					groups = gg
+
+			if uid != "" {
+				displayName := ""
+				if v, ok := c.Get("userName"); ok {
+					if s, ok2 := v.(string); ok2 {
+						displayName = s
+					}
 				}
-			}
-			if displayName == "" && req.UserContext != nil {
-				displayName = req.UserContext.DisplayName
-			}
-			if len(groups) == 0 && req.UserContext != nil {
-				groups = req.UserContext.Groups
-			}
-			session["spec"].(map[string]interface{})["userContext"] = map[string]interface{}{
-				"userId":      uid,
-				"displayName": displayName,
-				"groups":      groups,
+				groups := []string{}
+				if v, ok := c.Get("userGroups"); ok {
+					if gg, ok2 := v.([]string); ok2 {
+						groups = gg
+					}
+				}
+				if displayName == "" && req.UserContext != nil {
+					displayName = req.UserContext.DisplayName
+				}
+				if len(groups) == 0 && req.UserContext != nil {
+					groups = req.UserContext.Groups
+				}
+				session["spec"].(map[string]interface{})["userContext"] = map[string]interface{}{
+					"userId":      uid,
+					"displayName": displayName,
+					"groups":      groups,
+				}
 			}
 		}
 	}
@@ -1276,8 +1360,18 @@ func UpdateSession(c *gin.Context) {
 	}
 
 	// Update SDK options in environmentVariables (filtered to allowed keys only)
-	if len(req.SdkOptions) > 0 {
-		filtered := filterSdkOptions(req.SdkOptions)
+	if req.ClearSdkOptions {
+		envVars, _ := spec["environmentVariables"].(map[string]interface{})
+		if envVars != nil {
+			delete(envVars, "SDK_OPTIONS")
+			spec["environmentVariables"] = envVars
+		}
+	} else if len(req.SdkOptions) > 0 {
+		filtered, filterErr := filterSdkOptions(req.SdkOptions)
+		if filterErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid sdkOptions: %v", filterErr)})
+			return
+		}
 		if len(filtered) > 0 {
 			sdkOptsJSON, err := json.Marshal(filtered)
 			if err != nil {
@@ -1431,7 +1525,12 @@ func UpdateSessionDisplayName(c *gin.Context) {
 func SelectWorkflow(c *gin.Context) {
 	project := c.GetString("project")
 	sessionName := c.Param("sessionName")
-	_, k8sDyn := GetK8sClientsForRequest(c)
+	if !isValidKubernetesName(sessionName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session name format"})
+		c.Abort()
+		return
+	}
+	k8sClt, k8sDyn := GetK8sClientsForRequest(c)
 	if k8sDyn == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or missing token"})
 		c.Abort()
@@ -1495,6 +1594,74 @@ func SelectWorkflow(c *gin.Context) {
 	}
 
 	log.Printf("Workflow updated for session %s: %s@%s", sessionName, req.GitURL, branch)
+
+	// If the session is Running, call the runner to clone the workflow immediately
+	status, _ := item.Object["status"].(map[string]interface{})
+	phase, _ := status["phase"].(string)
+	if phase == "Running" && req.GitURL != "" {
+		runnerURL := fmt.Sprintf("http://session-%s.%s.svc.cluster.local:8001/workflow", sessionName, project)
+		runnerReq := map[string]string{
+			"gitUrl": req.GitURL,
+			"branch": branch,
+			"path":   req.Path,
+		}
+		reqBody, _ := json.Marshal(runnerReq)
+
+		log.Printf("Calling runner to clone workflow: %s -> %s", req.GitURL, runnerURL)
+		httpReq, err := http.NewRequestWithContext(c.Request.Context(), "POST", runnerURL, bytes.NewReader(reqBody))
+		if err != nil {
+			log.Printf("Failed to create runner workflow request: %v", err)
+		} else {
+			httpReq.Header.Set("Content-Type", "application/json")
+
+			// Get userID from spec for token retrieval
+			var userID string
+			if specMap, ok := item.Object["spec"].(map[string]interface{}); ok {
+				if uc, ok := specMap["userContext"].(map[string]interface{}); ok {
+					if v, ok := uc["userId"].(string); ok {
+						userID = strings.TrimSpace(v)
+					}
+				}
+			}
+
+			// Attach GitHub or GitLab token for authenticated clone
+			if k8sClt != nil && userID != "" {
+				provider := types.DetectProvider(req.GitURL)
+				switch provider {
+				case types.ProviderGitHub:
+					if GetGitHubToken != nil {
+						if token, err := GetGitHubToken(c.Request.Context(), k8sClt, k8sDyn, project, userID); err == nil && token != "" {
+							httpReq.Header.Set("X-GitHub-Token", token)
+							log.Printf("SelectWorkflow: configured GitHub authentication for project=%s session=%s", project, sessionName)
+						}
+					}
+				case types.ProviderGitLab:
+					if GetGitLabToken != nil {
+						if token, err := GetGitLabToken(c.Request.Context(), k8sClt, project, userID); err == nil && token != "" {
+							httpReq.Header.Set("X-GitLab-Token", token)
+							log.Printf("SelectWorkflow: configured GitLab authentication for project=%s session=%s", project, sessionName)
+						}
+					}
+				default:
+					log.Printf("SelectWorkflow: unknown provider detected, proceeding without authentication")
+				}
+			}
+
+			client := &http.Client{Timeout: 120 * time.Second}
+			resp, err := client.Do(httpReq)
+			if err != nil {
+				log.Printf("Failed to call runner to clone workflow: %v", err)
+			} else {
+				defer resp.Body.Close()
+				if resp.StatusCode != http.StatusOK {
+					body, _ := io.ReadAll(resp.Body)
+					log.Printf("Runner failed to clone workflow (status %d): %s", resp.StatusCode, string(body))
+				} else {
+					log.Printf("Runner successfully cloned workflow %s for session %s", req.GitURL, sessionName)
+				}
+			}
+		}
+	}
 
 	// Respond with updated session summary
 	session := types.AgenticSession{
@@ -2092,12 +2259,19 @@ func ListOOTBWorkflows(c *gin.Context) {
 		var ambientConfig struct {
 			Name        string `json:"name"`
 			Description string `json:"description"`
+			Enabled     *bool  `json:"enabled,omitempty"`
 		}
 		if err == nil {
 			// Parse ambient.json if found
 			if parseErr := json.Unmarshal(ambientData, &ambientConfig); parseErr != nil {
 				log.Printf("ListOOTBWorkflows: failed to parse ambient.json for %s: %v", entryName, parseErr)
 			}
+		}
+
+		// Skip workflows explicitly disabled in ambient.json
+		if ambientConfig.Enabled != nil && !*ambientConfig.Enabled {
+			log.Printf("ListOOTBWorkflows: skipping disabled workflow %s", entryName)
+			continue
 		}
 
 		// Use ambient.json values or fallback to directory name
