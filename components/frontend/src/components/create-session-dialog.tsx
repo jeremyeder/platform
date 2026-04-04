@@ -265,7 +265,7 @@ export function CreateSessionDialog({
     <>
       <div onClick={handleTriggerClick}>{trigger}</div>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="w-full max-w-3xl min-w-[650px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-3xl sm:min-w-[650px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Session</DialogTitle>
           </DialogHeader>
