@@ -36,6 +36,7 @@ export function useAGUIStream(options: UseAGUIStreamOptions): UseAGUIStreamRetur
     onConnected,
     onDisconnected,
     onTraceId,
+    onCustomEvent,
   } = options
 
   const [state, setState] = useState(initialState)
@@ -84,11 +85,12 @@ export function useAGUIStream(options: UseAGUIStreamOptions): UseAGUIStreamRetur
         currentRunIdRef,
         hiddenMessageIdsRef,
         onFrontendToolCall: handleFrontendToolCall,
+        onCustomEvent,
       }
 
       setState((prev) => processAGUIEvent(prev, event, callbacks))
     },
-    [onEvent, onMessage, onError, onTraceId, handleFrontendToolCall],
+    [onEvent, onMessage, onError, onTraceId, handleFrontendToolCall, onCustomEvent],
   )
 
   // Keep processEventRef up to date to avoid stale closures in EventSource handler

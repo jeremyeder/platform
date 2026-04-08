@@ -210,6 +210,27 @@ export default function ProjectSessionDetailPage({
       console.error("AG-UI stream error:", err)
     },
     onTraceId: (traceId) => setLangfuseTraceId(traceId),  // Capture Langfuse trace ID for feedback
+    onCustomEvent: (name, value) => {
+      if (name === "config:discovered") {
+        const repo = (value.repo as string) || "repository";
+        const features = value.features as Record<string, boolean> | undefined;
+        const featureList = features
+          ? Object.entries(features)
+              .filter(([, v]) => v)
+              .map(([k]) => k)
+              .join(", ")
+          : "";
+        toast.success(
+          `Discovered .ambient/config.json in ${repo}`,
+          {
+            description: featureList
+              ? `Enabled: ${featureList}`
+              : undefined,
+            duration: 6000,
+          },
+        );
+      }
+    },
   });
   const aguiState = aguiStream.state;
   const aguiSendMessage = aguiStream.sendMessage;

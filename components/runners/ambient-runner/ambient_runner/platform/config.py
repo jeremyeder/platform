@@ -74,6 +74,105 @@ def load_mcp_config(context: RunnerContext, cwd_path: str) -> dict | None:
         return None
 
 
+def load_repo_config(repo_path: str) -> dict:
+    """Load .ambient/config.json from a repository.
+
+    Returns the parsed config dict, or {} if file is missing or invalid.
+    """
+    try:
+        config_path = Path(repo_path) / ".ambient" / "config.json"
+        if not config_path.exists():
+            return {}
+        with open(config_path, "r") as f:
+            config = _json.load(f)
+            logger.info(f"Loaded .ambient/config.json from {repo_path}")
+            return config
+    except _json.JSONDecodeError as e:
+        logger.warning(f"Invalid JSON in .ambient/config.json at {repo_path}: {e}")
+        return {}
+    except Exception as e:
+        logger.warning(f"Error reading .ambient/config.json at {repo_path}: {e}")
+        return {}
+
+
+async def evaluate_workspace_flag(
+    backend_url: str,
+    project: str,
+    flag_name: str,
+    token: str,
+) -> bool:
+    """Evaluate a workspace feature flag via the backend API.
+
+    Calls GET /api/projects/{project}/feature-flags/evaluate/{flag_name}.
+    Returns the 'enabled' field from the response, or False on any error.
+    """
+    import aiohttp
+
+    url = f"{backend_url}/api/projects/{project}/feature-flags/evaluate/{flag_name}"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    enabled = data.get("enabled", False)
+                    logger.info(
+                        f"Feature flag {flag_name}: enabled={enabled}, "
+                        f"source={data.get('source', 'unknown')}"
+                    )
+                    return enabled
+                logger.warning(
+                    f"Feature flag evaluation failed: {flag_name} status={resp.status}"
+                )
+                return False
+    except Exception as e:
+        logger.warning(f"Feature flag evaluation error for {flag_name}: {e}")
+        return False
+
+
+def is_continuous_learning_enabled(
+    repo_configs: list[tuple[str, dict]],
+    workspace_flag: bool,
+) -> tuple[bool, str | None]:
+    """Check if continuous learning is enabled.
+
+    Two gates:
+    1. workspace_flag must be True
+    2. At least one repo config must have learning.enabled = True
+
+    If multiple repos have learning enabled, warns and uses first.
+
+    Returns:
+        (enabled, target_repo_path) or (False, None)
+    """
+    if not workspace_flag:
+        logger.info("Continuous learning: workspace flag is disabled")
+        return False, None
+
+    cl_repos = [
+        (path, cfg)
+        for path, cfg in repo_configs
+        if cfg.get("learning", {}).get("enabled", False)
+    ]
+
+    if not cl_repos:
+        logger.info("Continuous learning: no repo has learning.enabled=true")
+        return False, None
+
+    if len(cl_repos) > 1:
+        repo_names = [path for path, _ in cl_repos]
+        logger.warning(
+            f"Continuous learning: multiple repos have learning enabled "
+            f"({repo_names}). Using first: {cl_repos[0][0]}"
+        )
+
+    target_path = cl_repos[0][0]
+    logger.info(f"Continuous learning enabled for repo: {target_path}")
+    return True, target_path
+
+
 def get_repos_config() -> list[dict]:
     """Read repos mapping from REPOS_JSON env if present.
 

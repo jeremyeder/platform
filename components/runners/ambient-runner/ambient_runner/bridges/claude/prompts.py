@@ -8,7 +8,11 @@ preset format (``type: "preset", preset: "claude_code"``).
 from ambient_runner.platform.prompts import resolve_workspace_prompt
 
 
-def build_sdk_system_prompt(workspace_path: str, cwd_path: str) -> dict:
+def build_sdk_system_prompt(
+    workspace_path: str,
+    cwd_path: str,
+    cl_config: dict | None = None,
+) -> dict:
     """Build the full system prompt config dict for the Claude SDK.
 
     Wraps the platform workspace context prompt in the Claude Code preset.
@@ -16,5 +20,7 @@ def build_sdk_system_prompt(workspace_path: str, cwd_path: str) -> dict:
     return {
         "type": "preset",
         "preset": "claude_code",
-        "append": resolve_workspace_prompt(workspace_path, cwd_path),
+        "append": resolve_workspace_prompt(
+            workspace_path, cwd_path, cl_config=cl_config
+        ),
     }

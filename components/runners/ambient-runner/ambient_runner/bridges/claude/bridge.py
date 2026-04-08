@@ -194,6 +194,24 @@ class ClaudeBridge(PlatformBridge):
                     prompt=user_msg,
                 )
 
+                # Emit CL discovery event once, then clear to avoid re-firing
+                cl_discovery = self._cl_discovery
+                if cl_discovery is not None:
+                    self._cl_discovery = None
+                    from ag_ui_protocol import CustomEvent, EventType as _ET
+
+                    target = cl_discovery.get("target_repo", "")
+                    repo_name = os.path.basename(target) if target else "repo"
+                    yield CustomEvent(
+                        type=_ET.CUSTOM,
+                        name="config:discovered",
+                        value={
+                            "repo": repo_name,
+                            "repo_path": target,
+                            "features": {"learning": True},
+                        },
+                    )
+
                 async for event in wrapped_stream:
                     yield event
 
@@ -569,10 +587,65 @@ class ClaudeBridge(PlatformBridge):
         log_auth_status(mcp_servers)
         allowed_tools = build_allowed_tools(mcp_servers)
 
+        # Continuous Learning config
+        from ambient_runner.platform.config import (
+            is_continuous_learning_enabled,
+            load_repo_config,
+        )
+
+        from ambient_runner.platform.utils import is_env_truthy
+
+        cl_config = None
+        workspace_path = self._context.workspace_path
+        repos_dir = os.path.join(workspace_path, "repos")
+        # Check workspace flag first to avoid scanning repos when disabled
+        cl_flag = is_env_truthy(os.getenv("CONTINUOUS_LEARNING_ENABLED", ""))
+        if cl_flag and os.path.isdir(repos_dir):
+            repo_configs = []
+            try:
+                for entry in os.listdir(repos_dir):
+                    repo_path = os.path.join(repos_dir, entry)
+                    if os.path.isdir(repo_path):
+                        cfg = load_repo_config(repo_path)
+                        if cfg:
+                            repo_configs.append((repo_path, cfg))
+            except Exception as e:
+                logger.warning(f"Error scanning repos for CL config: {e}")
+
+            if repo_configs:
+                enabled, target_repo = is_continuous_learning_enabled(
+                    repo_configs, cl_flag
+                )
+                if enabled and target_repo:
+                    # Derive author from git config in the target repo
+                    author_name = "unknown"
+                    try:
+                        import subprocess
+
+                        result = subprocess.run(
+                            ["git", "config", "user.name"],
+                            capture_output=True,
+                            text=True,
+                            cwd=target_repo,
+                            timeout=5,
+                        )
+                        if result.returncode == 0 and result.stdout.strip():
+                            author_name = result.stdout.strip()
+                    except Exception:
+                        pass
+
+                    cl_config = {
+                        "enabled": True,
+                        "target_repo": target_repo,
+                        "author_name": author_name,
+                    }
+
         # System prompt
         from ambient_runner.bridges.claude.prompts import build_sdk_system_prompt
 
-        system_prompt = build_sdk_system_prompt(self._context.workspace_path, cwd_path)
+        system_prompt = build_sdk_system_prompt(
+            self._context.workspace_path, cwd_path, cl_config=cl_config
+        )
 
         # Store results
         self._configured_model = configured_model
@@ -581,6 +654,7 @@ class ClaudeBridge(PlatformBridge):
         self._mcp_servers = mcp_servers
         self._allowed_tools = allowed_tools
         self._system_prompt = system_prompt
+        self._cl_discovery = cl_config  # None or {"enabled": True, ...}
 
     def _rebuild_mcp_servers(self) -> None:
         """Rebuild MCP server config with current env vars.

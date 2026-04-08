@@ -149,3 +149,10 @@ git push --no-verify      # Skip pre-push hooks
 ## More Info
 
 See [BOOKMARKS.md](BOOKMARKS.md) for architecture decisions, development context, code patterns, and component-specific guides.
+
+## Active Technologies
+- Python 3.11 (runner), Go 1.22+ (backend/operator), TypeScript/Next.js 16 (triage dashboard) + Claude Agent SDK, `gh` CLI, `git`, llm-wiki-compiler plugin, Unleash (feature flags) (001-continuous-learning)
+- Git repositories (files in `docs/learned/`, `docs/wiki/`). No database. (001-continuous-learning)
+
+## Recent Changes
+- 001-continuous-learning: Added Python 3.11 (runner), Go 1.22+ (backend/operator), TypeScript/Next.js 16 (triage dashboard) + Claude Agent SDK, `gh` CLI, `git`, llm-wiki-compiler plugin, Unleash (feature flags)

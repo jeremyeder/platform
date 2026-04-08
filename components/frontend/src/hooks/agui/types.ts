@@ -19,6 +19,7 @@ export type UseAGUIStreamOptions = {
   onConnected?: () => void
   onDisconnected?: () => void
   onTraceId?: (traceId: string) => void  // Called when Langfuse trace_id is received
+  onCustomEvent?: (name: string, value: Record<string, unknown>) => void
 }
 
 export type UseAGUIStreamReturn = {

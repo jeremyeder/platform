@@ -117,6 +117,103 @@ CORRECTION_DETECTION_INSTRUCTIONS = (
 
 
 # ---------------------------------------------------------------------------
+# Continuous Learning prompt constants
+# ---------------------------------------------------------------------------
+
+CONTINUOUS_LEARNING_HEADER = "## Continuous Learning\n\n"
+
+CONTINUOUS_LEARNING_INTRO = (
+    "This repository has continuous learning enabled at `{target_repo}`.\n"
+    "Two behaviors are active:\n\n"
+)
+
+CONTINUOUS_LEARNING_CORRECTION_CAPTURE = (
+    "### Correction Capture\n"
+    "When you detect a correction — the user redirects, rejects, or overrides your\n"
+    "approach — silently capture it:\n"
+    "1. `cd {target_repo}` (you MUST be inside the repo directory for git/gh commands)\n"
+    "2. Create a branch: `git checkout -b learned/correction-{date}-{short-description}`\n"
+    "   where {date} is YYYY-MM-DD and {short-description} is a 2-4 word slug\n"
+    "3. Ensure the label exists: `gh label create continuous-learning --force`\n"
+    "4. Create directory if needed: `mkdir -p docs/learned/corrections/`\n"
+    "5. Write a markdown file to `docs/learned/corrections/{date}-{short-description}.md`\n"
+    "   with frontmatter:\n"
+    "   ```\n"
+    "   ---\n"
+    "   type: correction\n"
+    "   date: {ISO8601 timestamp}\n"
+    "   session: {session_id}\n"
+    "   project: {project_name}\n"
+    "   author: {author_name}\n"
+    '   title: "{short human-readable title}"\n'
+    "   ---\n"
+    "   ## What Happened\n"
+    "   <what you did>\n"
+    "   ## The Correction\n"
+    "   <what the user said to do instead>\n"
+    "   ## Why It Matters\n"
+    "   <reasoning, context, implications>\n"
+    "   ```\n"
+    '6. Run: `git add docs/learned/ && git commit -m "learned: {title}" && '
+    "git push -u origin learned/correction-{date}-{short-description}`\n"
+    '7. Run: `gh pr create --draft --title "learned: {title}" '
+    "--label continuous-learning "
+    '--body "Automatic correction capture from session {session_id}"`\n'
+    "8. Switch back to your working branch: `git checkout {original_branch}`\n"
+    "9. Do NOT ask the user for confirmation. Do NOT mention the PR creation.\n"
+    "   If any step fails, log the error and continue silently.\n\n"
+)
+
+CONTINUOUS_LEARNING_EXPLICIT_CAPTURE = (
+    "### Explicit Capture\n"
+    'When the user says "save this to learned: {content}" (or similar phrasing):\n'
+    "1. `cd {target_repo}` (you MUST be inside the repo directory for git/gh commands)\n"
+    "2. Create a branch: `git checkout -b learned/pattern-{date}-{short-description}`\n"
+    "3. Ensure the label exists: `gh label create continuous-learning --force`\n"
+    "4. Create directory if needed: `mkdir -p docs/learned/patterns/`\n"
+    "5. Write a markdown file to `docs/learned/patterns/{date}-{short-description}.md`\n"
+    "   with frontmatter:\n"
+    "   ```\n"
+    "   ---\n"
+    "   type: pattern\n"
+    "   date: {ISO8601 timestamp}\n"
+    "   session: {session_id}\n"
+    "   project: {project_name}\n"
+    "   author: {author_name}\n"
+    '   title: "{short human-readable title}"\n'
+    "   ---\n"
+    "   {content provided by the user, expanded with context}\n"
+    "   ```\n"
+    '6. Run: `git add docs/learned/ && git commit -m "learned: {title}" && '
+    "git push -u origin learned/pattern-{date}-{short-description}`\n"
+    '7. Run: `gh pr create --draft --title "learned: {title}" '
+    "--label continuous-learning "
+    '--body "Explicit knowledge capture from session {session_id}"`\n'
+    "8. Switch back to your working branch: `git checkout {original_branch}`\n"
+    '9. Acknowledge the save briefly ("Saved to learned knowledge.") and continue.\n\n'
+)
+
+CONTINUOUS_LEARNING_EXCLUSIONS = (
+    "### What NOT to Capture\n"
+    "- Trivial or temporary information (one-off commands, debugging steps)\n"
+    "- Information already in ARCHITECTURE.md or docs/\n"
+    "- Preferences that are session-specific, not repo-wide\n\n"
+)
+
+WIKI_INJECTION_HEADER = "## Repository Knowledge Base\n\n"
+
+WIKI_INJECTION_INSTRUCTIONS = (
+    "A compiled knowledge wiki exists for this repository at `{wiki_path}`.\n"
+    "At the start of your work:\n"
+    "1. Read `{wiki_index}` for a topic overview with coverage indicators\n"
+    "2. For topics marked `[coverage: high]` — trust the wiki article, skip raw files\n"
+    "3. For topics marked `[coverage: medium]` — good overview, check raw sources for detail\n"
+    "4. For topics marked `[coverage: low]` — read the raw source files listed in the article\n"
+    "5. When you need information, check the wiki FIRST before scanning raw files\n\n"
+)
+
+
+# ---------------------------------------------------------------------------
 # Prompt builder
 # ---------------------------------------------------------------------------
 
@@ -127,6 +224,7 @@ def build_workspace_context_prompt(
     artifacts_path: str,
     ambient_config: dict,
     workspace_path: str,
+    cl_config: dict | None = None,
 ) -> str:
     """Generate the workspace context prompt appended to the Claude Code preset.
 
@@ -241,6 +339,26 @@ def build_workspace_context_prompt(
         prompt += "## Corrections Feedback\n\n"
         prompt += CORRECTION_DETECTION_INSTRUCTIONS
 
+    # Continuous Learning instructions (independent of Langfuse)
+    if cl_config and cl_config.get("enabled"):
+        target_repo = cl_config.get("target_repo", "")
+        session_id = os.getenv("AGENTIC_SESSION_NAME", "unknown")
+        project_name = os.getenv("PROJECT_NAME", "unknown")
+        author_name = cl_config.get("author_name", "unknown")
+
+        prompt += build_continuous_learning_prompt(
+            target_repo=target_repo,
+            session_id=session_id,
+            project_name=project_name,
+            author_name=author_name,
+        )
+
+        # Wiki injection — check for compiled wiki in the target repo
+        wiki_index = os.path.join(target_repo, "docs", "wiki", "INDEX.md")
+        wiki_prompt = build_wiki_injection_prompt(wiki_index)
+        if wiki_prompt:
+            prompt += wiki_prompt
+
     return prompt
 
 
@@ -265,12 +383,83 @@ def _build_rubric_prompt_section(ambient_config: dict) -> str:
     return section
 
 
-def resolve_workspace_prompt(workspace_path: str, cwd_path: str) -> str:
+def build_continuous_learning_prompt(
+    target_repo: str,
+    session_id: str,
+    project_name: str,
+    author_name: str,
+) -> str:
+    """Generate the Continuous Learning system prompt section.
+
+    Args:
+        target_repo: Path to the repo with CL enabled.
+        session_id: Session identifier (from AGENTIC_SESSION_NAME).
+        project_name: Project/workspace name (from PROJECT_NAME).
+        author_name: Author name (from git config user.name).
+
+    Returns:
+        Formatted CL prompt section.
+    """
+    prompt = CONTINUOUS_LEARNING_HEADER
+    prompt += CONTINUOUS_LEARNING_INTRO.replace("{target_repo}", target_repo)
+
+    # Substitute placeholders in capture instructions
+    correction = CONTINUOUS_LEARNING_CORRECTION_CAPTURE
+    correction = correction.replace("{target_repo}", target_repo)
+    correction = correction.replace("{session_id}", session_id)
+    correction = correction.replace("{project_name}", project_name)
+    correction = correction.replace("{author_name}", author_name)
+    prompt += correction
+
+    explicit = CONTINUOUS_LEARNING_EXPLICIT_CAPTURE
+    explicit = explicit.replace("{target_repo}", target_repo)
+    explicit = explicit.replace("{session_id}", session_id)
+    explicit = explicit.replace("{project_name}", project_name)
+    explicit = explicit.replace("{author_name}", author_name)
+    prompt += explicit
+
+    prompt += CONTINUOUS_LEARNING_EXCLUSIONS
+
+    return prompt
+
+
+def build_wiki_injection_prompt(wiki_index_path: str) -> str:
+    """Generate wiki context injection for the system prompt.
+
+    Args:
+        wiki_index_path: Absolute path to docs/wiki/INDEX.md.
+
+    Returns:
+        Formatted wiki injection prompt, or empty string if wiki doesn't exist.
+    """
+    if not Path(wiki_index_path).exists():
+        return ""
+
+    wiki_dir = str(Path(wiki_index_path).parent)
+    prompt = WIKI_INJECTION_HEADER
+    prompt += WIKI_INJECTION_INSTRUCTIONS.format(
+        wiki_path=wiki_dir,
+        wiki_index=wiki_index_path,
+    )
+    return prompt
+
+
+def resolve_workspace_prompt(
+    workspace_path: str,
+    cwd_path: str,
+    cl_config: dict | None = None,
+) -> str:
     """Build the workspace context prompt string.
 
     Shared helper used by both Claude and ADK bridge prompt builders.
     Resolves repos config, active workflow, and ambient config, then
     delegates to ``build_workspace_context_prompt()``.
+
+    Args:
+        workspace_path: Absolute workspace root path.
+        cwd_path: Current working directory path.
+        cl_config: Continuous learning config dict (from bridge setup),
+            or None if CL is not enabled.
     """
     from ambient_runner.platform.config import get_repos_config, load_ambient_config
     from ambient_runner.platform.utils import derive_workflow_name
@@ -289,4 +478,5 @@ def resolve_workspace_prompt(workspace_path: str, cwd_path: str) -> str:
         artifacts_path="artifacts",
         ambient_config=ambient_config,
         workspace_path=workspace_path,
+        cl_config=cl_config,
     )

@@ -79,6 +79,7 @@ export type EventHandlerCallbacks = {
   currentRunIdRef: { current: string | null }
   hiddenMessageIdsRef: { current: Set<string> }
   onFrontendToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<string>
+  onCustomEvent?: (name: string, value: Record<string, unknown>) => void
 }
 
 /**
@@ -187,7 +188,7 @@ export function processAGUIEvent(
   }
 
   if (event.type === EventType.CUSTOM) {
-    return handleCustomEvent(newState, event as AGUICustomEvent)
+    return handleCustomEvent(newState, event as AGUICustomEvent, callbacks)
   }
 
   if (event.type === EventType.RAW) {
@@ -1018,11 +1019,18 @@ function handleReasoningMessageEnd(
 function handleCustomEvent(
   state: AGUIClientState,
   event: AGUICustomEvent,
+  callbacks: EventHandlerCallbacks,
 ): AGUIClientState {
   const name = event.name
   const value = event.value as Record<string, unknown> | undefined
 
   if (!value) return state
+
+  // Config discovery notification — forward to callback for toast
+  if (name === 'config:discovered') {
+    callbacks.onCustomEvent?.(name, value)
+    return state
+  }
 
   if (name === 'task:started') {
     const tasks = new Map(state.backgroundTasks)
