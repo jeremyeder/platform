@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Projects · Ambient Console</title>
+<link rel="icon" type="image/svg+xml" href="_favicon.svg" />
 <link rel="preconnect" href="https://rsms.me/" />
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
 <link rel="stylesheet" href="_console.css" />
@@ -15,6 +16,8 @@
     <a href="02-sessions.html">2 — Sessions list</a>
     <a href="03-session-detail.html">3 — Session detail</a>
   </div>
+
+  <div class="backdrop" onclick="document.body.classList.remove('drawer-open')"></div>
 
   <div class="shell">
     <!-- ========= LEFT RAIL ========= -->
@@ -74,6 +77,9 @@
     <!-- ========= MAIN ========= -->
     <main class="main">
       <div class="topbar">
+        <button class="mobile-menu mobile-only" onclick="document.body.classList.toggle('drawer-open')" aria-label="Open menu">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
         <nav class="breadcrumbs">
           <span class="current">Projects</span>
         </nav>
@@ -83,6 +89,10 @@
           Jump to project, session, or command…
           <span class="kbd">⌘K</span>
         </div>
+        <button class="icon-btn notif-btn" title="Notifications">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="notif-badge">3</span>
+        </button>
       </div>
 
       <div class="content">
@@ -132,9 +142,11 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             <input placeholder="Filter projects by name, label, or owner…" />
           </div>
-          <button class="chip active">All <span class="count">24</span></button>
-          <button class="chip">Mine <span class="count">6</span></button>
-          <button class="chip">Starred <span class="count">3</span></button>
+          <div class="chips-scroll">
+            <button class="chip active">All <span class="count">24</span></button>
+            <button class="chip">Mine <span class="count">6</span></button>
+            <button class="chip">Starred <span class="count">3</span></button>
+          </div>
           <div class="spacer" style="flex:1;"></div>
           <button class="btn ghost">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
@@ -143,7 +155,7 @@
         </div>
 
         <!-- table -->
-        <table class="table">
+        <table class="table projects-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -156,7 +168,7 @@
           </thead>
           <tbody>
             <tr>
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -169,7 +181,7 @@
               <td class="mono">3</td>
               <td class="mono">$4.12</td>
               <td class="muted">3 min ago</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
@@ -177,7 +189,7 @@
               </td>
             </tr>
             <tr class="selected">
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -190,7 +202,7 @@
               <td class="mono">2</td>
               <td class="mono">$2.86</td>
               <td class="muted">12 min ago</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
@@ -198,7 +210,7 @@
               </td>
             </tr>
             <tr>
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -211,7 +223,7 @@
               <td class="mono">1</td>
               <td class="mono">$1.04</td>
               <td class="muted">41 min ago</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
@@ -219,7 +231,7 @@
               </td>
             </tr>
             <tr>
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -232,7 +244,7 @@
               <td class="mono muted">0</td>
               <td class="mono">$0.00</td>
               <td class="muted">2 hr ago</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
@@ -240,7 +252,7 @@
               </td>
             </tr>
             <tr>
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -253,7 +265,7 @@
               <td class="mono muted">0</td>
               <td class="mono muted">—</td>
               <td class="muted">yesterday</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
@@ -261,7 +273,7 @@
               </td>
             </tr>
             <tr>
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -274,7 +286,7 @@
               <td class="mono muted">0</td>
               <td class="mono">$0.00</td>
               <td class="muted">3 days ago</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
@@ -282,7 +294,7 @@
               </td>
             </tr>
             <tr>
-              <td>
+              <td class="name-cell">
                 <div class="name">
                   <div class="icon-chip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
                   <div>
@@ -295,7 +307,7 @@
               <td class="mono muted">0</td>
               <td class="mono">$0.00</td>
               <td class="muted">5 days ago</td>
-              <td class="col-right">
+              <td class="col-right actions-cell">
                 <div class="row-actions">
                   <button class="icon-btn" title="Open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></button>
                   <button class="icon-btn" title="Actions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>

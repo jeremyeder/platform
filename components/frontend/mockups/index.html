@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ambient Console · Alt UI mockups</title>
+<link rel="icon" type="image/svg+xml" href="_favicon.svg" />
 <link rel="preconnect" href="https://rsms.me/" />
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
 <link rel="stylesheet" href="_console.css" />
@@ -56,6 +57,36 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="m9 18 6-6-6-6"/></svg>
         </div>
       </a>
+    </div>
+
+    <div class="section">
+      <h2>Notifications &amp; context window</h2>
+      <p>
+        The alt UI treats notifications and context window pressure as first-class concerns,
+        since both are load-bearing for an agent platform.
+      </p>
+      <ul>
+        <li><strong style="color:var(--fg);">Browser tab dot.</strong> The favicon is an SVG with a red notification circle overlaid on the Ambient mark. When the count drops to zero the overlay disappears — this tab is the "is anything waiting for me" signal.</li>
+        <li><strong style="color:var(--fg);">Topbar bell.</strong> A bell icon with a badge count sits next to ⌘K in the topbar on every page. Opens a panel (not shown in static mockups) with session notifications (AskUserQuestion pending, rate limit recovery, session failed, compaction happened, MCP connected).</li>
+        <li><strong style="color:var(--fg);">Session row pulse.</strong> On the sessions list, any row with pending notifications shows a pulsing red dot next to its title and a <em>Waiting for input</em> phase — see <code>sess-q7mv22</code> on mockup 2.</li>
+        <li><strong style="color:var(--fg);">Context window meter.</strong> On the session detail topstrip, a dedicated widget shows <code>%</code> + <code>tokens / max</code> + compaction count. Color ramps from green → amber → red as usage climbs. <code>2×</code> next to the stack icon means compaction has fired twice so far in this session.</li>
+        <li><strong style="color:var(--fg);">Inline system events.</strong> The chat stream interleaves first-class system events (not normal chat messages) with a pill + rule line: <em>Context compacted · 38 older messages summarized · 94K → 52K tokens</em>, <em>Rate limit hit · retrying in 28s</em>, etc. This gives an audit trail of what happened <em>around</em> the agent's work without breaking the message flow.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Responsive behavior</h2>
+      <p>
+        All three mockups are fully responsive. Resize the browser below ~768px
+        (or open in devtools device mode) to see the mobile layout.
+      </p>
+      <ul>
+        <li><strong style="color:var(--fg);">Phone (≤768px).</strong> Left rail becomes a hamburger drawer with backdrop. Topbar collapses ⌘K to a search icon and shows only the current breadcrumb segment. Stats strip becomes a 2×2 grid. Filter chips and project sub-nav scroll horizontally. Data tables collapse to stacked cards with CSS-driven field labels and always-visible row actions.</li>
+        <li><strong style="color:var(--fg);">Small phone (≤400px).</strong> Stats strip stacks to a single column. Breadcrumbs truncate to ~52vw.</li>
+        <li><strong style="color:var(--fg);">Tablet (≤1100px).</strong> Rail narrows, content padding tightens, explorer panel shrinks but stays side-by-side with chat.</li>
+        <li><strong style="color:var(--fg);">Session detail on phone.</strong> The chat + explorer split becomes a segmented control (Chat / Files). One pane is visible at a time. The file viewer toolbar still uses a single row — breadcrumb segments truncate, actions stay fixed.</li>
+        <li><strong style="color:var(--fg);">Touch targets.</strong> All icon buttons bump from 28×28 to 36×36 on phone. Filter chips grow to 30px. Composer send button grows to 36px.</li>
+      </ul>
     </div>
 
     <div class="section">

@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Audit anchor links · Session · Ambient Console</title>
+<link rel="icon" type="image/svg+xml" href="_favicon.svg" />
 <link rel="preconnect" href="https://rsms.me/" />
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
 <link rel="stylesheet" href="_console.css" />
@@ -15,6 +16,8 @@
     <a href="02-sessions.html">2 — Sessions list</a>
     <a href="03-session-detail.html" class="current">3 — Session detail</a>
   </div>
+
+  <div class="backdrop" onclick="document.body.classList.remove('drawer-open')"></div>
 
   <div class="shell">
     <!-- ========= LEFT RAIL ========= -->
@@ -74,6 +77,9 @@
     <!-- ========= MAIN ========= -->
     <main class="main">
       <div class="topbar">
+        <button class="mobile-menu mobile-only" onclick="document.body.classList.toggle('drawer-open')" aria-label="Open menu">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
         <nav class="breadcrumbs">
           <a href="01-projects.html">Projects</a>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sep"><path d="m9 18 6-6-6-6"/></svg>
@@ -89,6 +95,10 @@
           Jump to project, session, or command…
           <span class="kbd">⌘K</span>
         </div>
+        <button class="icon-btn notif-btn" title="Notifications">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="notif-badge">3</span>
+        </button>
       </div>
 
       <div class="content">
@@ -100,6 +110,20 @@
               Audit all anchor links for 404s across the site
             </div>
             <div class="subtitle">sess-auth-bug-fix · started 1 hr ago · docs-refresh / main</div>
+          </div>
+          <div class="context-meter warn" title="Context window usage">
+            <div class="label">
+              Context
+              <span class="pct">68%</span>
+            </div>
+            <div class="bar"><div class="fill" style="width:68%;"></div></div>
+            <div class="detail">
+              <span>136K / 200K</span>
+              <span class="compactions" title="Context has been compacted 2 times">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+                2×
+              </span>
+            </div>
           </div>
           <div class="meta-group">
             <div class="meta-item">
@@ -137,8 +161,20 @@
           </div>
         </div>
 
+        <!-- Mobile-only: segmented control to flip between chat and explorer -->
+        <div class="mobile-pane-switch mobile-only">
+          <button class="active" onclick="document.querySelector('.split').dataset.mobilePane='chat'; this.classList.add('active'); this.nextElementSibling.classList.remove('active');">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Chat
+          </button>
+          <button onclick="document.querySelector('.split').dataset.mobilePane='explorer'; this.classList.add('active'); this.previousElementSibling.classList.remove('active');">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+            Files
+          </button>
+        </div>
+
         <!-- ===== Split: chat panel + explorer panel ===== -->
-        <div class="split">
+        <div class="split" data-mobile-pane="chat">
           <!-- ---------- Chat panel ---------- -->
           <section class="chat-panel">
             <div class="panel-tabs">
@@ -188,6 +224,26 @@
                   Bash · grep -r "href=\"#" docs/ | wc -l
                 </div>
                 <div class="msg-body">1,842 anchor references across 94 markdown files.</div>
+              </div>
+
+              <!-- Inline system event: rate limit warning -->
+              <div class="system-event warn">
+                <div class="line"></div>
+                <div class="chip">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                  Rate limit hit · retrying in 28s
+                </div>
+                <div class="line"></div>
+              </div>
+
+              <!-- Inline system event: context compaction -->
+              <div class="system-event compaction">
+                <div class="line"></div>
+                <div class="chip">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+                  Context compacted · 38 older messages summarized · 94K → 52K tokens
+                </div>
+                <div class="line"></div>
               </div>
 
               <div class="msg">
