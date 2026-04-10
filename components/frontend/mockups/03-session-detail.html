@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audit anchor links · Session · Ambient Console</title>
+<link rel="preconnect" href="https://rsms.me/" />
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<link rel="stylesheet" href="_console.css" />
+</head>
+<body>
+  <div class="mockup-nav">
+    <a href="index.html" class="home">← Ambient Console · Mockups</a>
+    <a href="01-projects.html">1 — Projects</a>
+    <a href="02-sessions.html">2 — Sessions list</a>
+    <a href="03-session-detail.html" class="current">3 — Session detail</a>
+  </div>
+
+  <div class="shell">
+    <!-- ========= LEFT RAIL ========= -->
+    <aside class="rail">
+      <div class="brand">
+        <div class="mark">A</div>
+        Ambient Console
+      </div>
+
+      <a class="nav-item" href="01-projects.html">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Projects
+        <span class="count">24</span>
+      </a>
+      <a class="nav-item active" href="02-sessions.html">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+        All sessions
+        <span class="count">186</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Scheduled
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Integrations
+      </a>
+
+      <div class="group-label">Workspace</div>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Members
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+        API keys
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Audit log
+      </a>
+
+      <div class="spacer"></div>
+
+      <div class="user-card">
+        <div class="avatar">JE</div>
+        <div class="user-info">
+          <div class="name">jeremyeder</div>
+          <div class="email">jeremyeder@redhat.com</div>
+        </div>
+        <button class="icon-btn" title="Account menu">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ========= MAIN ========= -->
+    <main class="main">
+      <div class="topbar">
+        <nav class="breadcrumbs">
+          <a href="01-projects.html">Projects</a>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sep"><path d="m9 18 6-6-6-6"/></svg>
+          <a href="02-sessions.html">docs-refresh</a>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sep"><path d="m9 18 6-6-6-6"/></svg>
+          <a href="02-sessions.html">Sessions</a>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sep"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="current">Audit anchor links</span>
+        </nav>
+        <div class="spacer"></div>
+        <div class="cmdk">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Jump to project, session, or command…
+          <span class="kbd">⌘K</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <!-- ===== Session top strip: identity + meta + actions ===== -->
+        <div class="session-topstrip">
+          <div class="title-block">
+            <div class="title">
+              <span class="dot completed"></span>
+              Audit all anchor links for 404s across the site
+            </div>
+            <div class="subtitle">sess-auth-bug-fix · started 1 hr ago · docs-refresh / main</div>
+          </div>
+          <div class="meta-group">
+            <div class="meta-item">
+              <div class="label">Phase</div>
+              <div class="value" style="color:var(--fg-muted);">Completed</div>
+            </div>
+            <div class="meta-item">
+              <div class="label">Model</div>
+              <div class="value">opus-4-6</div>
+            </div>
+            <div class="meta-item">
+              <div class="label">Turns</div>
+              <div class="value">14</div>
+            </div>
+            <div class="meta-item">
+              <div class="label">Duration</div>
+              <div class="value">12:46</div>
+            </div>
+            <div class="meta-item">
+              <div class="label">Cost</div>
+              <div class="value">$1.48</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn ghost" title="Refresh">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+            </button>
+            <button class="btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              Clone
+            </button>
+            <button class="btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- ===== Split: chat panel + explorer panel ===== -->
+        <div class="split">
+          <!-- ---------- Chat panel ---------- -->
+          <section class="chat-panel">
+            <div class="panel-tabs">
+              <button class="active">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Chat
+              </button>
+              <button>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+                Events <span class="count">214</span>
+              </button>
+              <button>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                Diagnostics
+              </button>
+            </div>
+
+            <div class="message-stream">
+              <div class="msg user">
+                <div class="msg-head">
+                  <span class="author">You</span>
+                  <span class="time">18:42:01</span>
+                </div>
+                <div class="msg-body">Walk the docs site and find every anchor link that 404s. Group findings by page and propose fixes.</div>
+              </div>
+
+              <div class="msg">
+                <div class="msg-head">
+                  <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);"></div>
+                  <span class="author">ambient · opus-4-6</span>
+                  <span class="time">18:42:03</span>
+                </div>
+                <div class="msg-body">I'll crawl the docs site starting from the root, collect every internal anchor link, and verify each one. Let me start by fetching the sitemap.</div>
+              </div>
+
+              <div class="msg tool">
+                <div class="tool-head">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  WebFetch · docs.ambient-code.dev/sitemap.xml
+                </div>
+                <div class="msg-body">Fetched 247 URLs. Parsing structure…</div>
+              </div>
+
+              <div class="msg tool">
+                <div class="tool-head">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  Bash · grep -r "href=\"#" docs/ | wc -l
+                </div>
+                <div class="msg-body">1,842 anchor references across 94 markdown files.</div>
+              </div>
+
+              <div class="msg">
+                <div class="msg-head">
+                  <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);"></div>
+                  <span class="author">ambient · opus-4-6</span>
+                  <span class="time">18:48:19</span>
+                </div>
+                <div class="msg-body">I found <strong>31 broken anchors</strong> across 12 pages. The root causes fall into three buckets:
+
+1. <strong>Renamed headings</strong> (18 links) — slugs changed when headings were rewritten, e.g. "Getting started" → "Getting set up"
+2. <strong>Moved pages</strong> (9 links) — the target heading moved to a new file during the /docs reshuffle last month
+3. <strong>Typos</strong> (4 links) — simple character errors
+
+I've written the full report to <code>anchor-audit.md</code> in artifacts. Want me to open PRs per bucket, or one big one?</div>
+              </div>
+
+              <div class="msg user">
+                <div class="msg-head">
+                  <span class="author">You</span>
+                  <span class="time">18:54:40</span>
+                </div>
+                <div class="msg-body">One PR per bucket. Keep the typos PR small enough to merge without review.</div>
+              </div>
+            </div>
+
+            <div class="composer">
+              <textarea placeholder="Reply to the agent…"></textarea>
+              <button class="btn primary" title="Send">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Send
+              </button>
+            </div>
+          </section>
+
+          <!-- ---------- Explorer panel ---------- -->
+          <aside class="explorer-panel">
+            <div class="panel-tabs">
+              <button class="active">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+                Files
+              </button>
+              <button>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                Context <span class="count">3</span>
+              </button>
+              <button>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/></svg>
+                Tasks
+              </button>
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- THE SINGLE UNIFIED FILE TOOLBAR                       -->
+            <!-- One row. Breadcrumb owns location + file identity.   -->
+            <!-- Trailing actions are the only controls. No duplicates.-->
+            <!-- ===================================================== -->
+            <div class="explorer-toolbar">
+              <div class="breadcrumb-path">
+                <span class="seg root" title="Change directory">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                  repos/docs
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;opacity:0.6;"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+                <span class="sep">/</span>
+                <span class="seg">artifacts</span>
+                <span class="sep">/</span>
+                <span class="seg current">anchor-audit.md</span>
+                <span class="size">Markdown · 4.1 KB</span>
+              </div>
+              <button class="icon-btn" title="Download file">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              </button>
+              <button class="icon-btn" title="Open in new tab">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+              </button>
+              <button class="icon-btn" title="Close file">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+
+            <div class="file-content">
+<span class="ln">1</span><span class="h"># Anchor audit — docs.ambient-code.dev</span>
+<span class="ln">2</span>
+<span class="ln">3</span><span class="c">Generated: 2026-04-10T18:48Z</span>
+<span class="ln">4</span><span class="c">Run ID: sess-auth-bug-fix · turn 9</span>
+<span class="ln">5</span>
+<span class="ln">6</span><span class="h">## Summary</span>
+<span class="ln">7</span>
+<span class="ln">8</span>Scanned <span class="s">247</span> pages, <span class="s">1842</span> anchors.
+<span class="ln">9</span>Found <span class="s">31</span> broken anchors across <span class="s">12</span> pages.
+<span class="ln">10</span>
+<span class="ln">11</span><span class="h">## Broken — renamed headings (18)</span>
+<span class="ln">12</span>
+<span class="ln">13</span>- `/docs/quickstart#getting-started`
+<span class="ln">14</span>  &nbsp;&nbsp;→ heading renamed to <span class="s">"Getting set up"</span>
+<span class="ln">15</span>  &nbsp;&nbsp;fix: `#getting-set-up`
+<span class="ln">16</span>- `/docs/cli#installing`
+<span class="ln">17</span>  &nbsp;&nbsp;→ heading renamed to <span class="s">"Install"</span>
+<span class="ln">18</span>  &nbsp;&nbsp;fix: `#install`
+<span class="ln">19</span>- `/docs/sessions#llm-config`
+<span class="ln">20</span>  &nbsp;&nbsp;→ heading renamed to <span class="s">"Model settings"</span>
+<span class="ln">21</span>  &nbsp;&nbsp;fix: `#model-settings`
+<span class="ln">22</span>
+<span class="ln">23</span><span class="h">## Broken — moved pages (9)</span>
+<span class="ln">24</span>
+<span class="ln">25</span>- `/docs/guides/deploy#ingress`
+<span class="ln">26</span>  &nbsp;&nbsp;→ moved to `/docs/ops/ingress`
+<span class="ln">27</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
