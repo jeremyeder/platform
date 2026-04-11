@@ -179,7 +179,7 @@ describe('Flagged Feature', () => {
     cy.request({
       method: 'POST',
       url: 'http://localhost:4242/api/admin/projects/default/features/category.feature.enabled/environments/development/on',
-      headers: { Authorization: '*:*.unleash-admin-token' },
+      headers: { Authorization: Cypress.env('UNLEASH_ADMIN_TOKEN') },
     });
   });
 
@@ -188,7 +188,7 @@ describe('Flagged Feature', () => {
     cy.request({
       method: 'POST',
       url: 'http://localhost:4242/api/admin/projects/default/features/category.feature.enabled/environments/development/off',
-      headers: { Authorization: '*:*.unleash-admin-token' },
+      headers: { Authorization: Cypress.env('UNLEASH_ADMIN_TOKEN') },
     });
   });
 

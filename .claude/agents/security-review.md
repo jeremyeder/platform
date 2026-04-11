@@ -50,7 +50,7 @@ Secrets created by the platform must have OwnerReferences for cleanup.
 ### S7: No hardcoded credentials (Blocker)
 
 ```bash
-grep -rn 'password.*=.*"\|api.key.*=.*"\|secret.*=.*"\|token.*=.*"' components/ --include="*.go" --include="*.py" --include="*.ts" | grep -v "_test\|test_\|mock\|example\|fixture\|\.d\.ts"
+grep -rn 'password.*=.*"\|api.key.*=.*"\|secret.*=.*"\|token.*=.*"' components/ --include="*.go" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.yaml" --include="*.yml" | grep -v "_test\|test_\|mock\|example\|fixture\|\.d\.ts"
 ```
 
 ## Output Format

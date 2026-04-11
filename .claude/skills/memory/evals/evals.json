@@ -16,5 +16,11 @@
     "expected_tool_call": "Skill",
     "expected_args": { "skill": "memory", "args": "prune" },
     "description": "Request to prune stale memories"
+  },
+  {
+    "input": "/memory",
+    "expected_tool_call": "Skill",
+    "expected_args": { "skill": "memory" },
+    "description": "Default to summary when no arguments provided"
   }
 ]

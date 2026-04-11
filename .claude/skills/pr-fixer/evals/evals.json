@@ -16,5 +16,11 @@
     "expected_tool_call": "Skill",
     "expected_args": { "skill": "pr-fixer", "args": "987" },
     "description": "Natural language with hash prefix on PR number"
+  },
+  {
+    "input": "/pr-fixer",
+    "expected_tool_call": "None",
+    "expected_args": {},
+    "description": "Missing required PR number should not invoke skill"
   }
 ]

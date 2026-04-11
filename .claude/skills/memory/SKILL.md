@@ -116,6 +116,8 @@ type: <user|feedback|project|reference>
 - Debugging solutions (the fix is in the code)
 - Anything in CLAUDE.md
 - Ephemeral task details
+- Secrets or credentials (API keys, tokens, passwords, private keys, OAuth secrets)
+- Sensitive personal data unless explicitly required
 
 ## Quality Guidelines
 

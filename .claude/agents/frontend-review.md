@@ -73,7 +73,8 @@ For components using `useQuery`:
 - Should handle empty data
 
 ```bash
-grep -rl "useQuery\|useSessions\|useSession" components/frontend/src/app/ --include="*.tsx"
+grep -rl "useQuery\|useSessions\|useSession" \
+  components/frontend/src/app/ components/frontend/src/components/ --include="*.tsx"
 ```
 
 Then check each file for `isLoading\|isPending` and `error` references.
