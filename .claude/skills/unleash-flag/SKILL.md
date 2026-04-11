@@ -147,13 +147,13 @@ if !FeatureEnabledForRequest(c, "category.feature.enabled") {
 
 ### Backend Middleware Gating
 
-For endpoints that should be entirely hidden behind a flag, create a middleware in `routes.go` that checks `FeatureEnabled()` and returns 404 when the flag is off:
+For endpoints that should be entirely hidden behind a flag, create a middleware in `routes.go` that checks `FeatureEnabledForRequest()` and returns 404 when the flag is off:
 
 ```go
 // routes.go — gate an entire route group
 flagged := router.Group("/api/v1/feature")
 flagged.Use(func(c *gin.Context) {
-    if !FeatureEnabled("category.feature.enabled") {
+    if !FeatureEnabledForRequest(c, "category.feature.enabled") {
         c.AbortWithStatus(http.StatusNotFound)
         return
     }
@@ -169,7 +169,10 @@ This returns 404 (not 403) when the flag is off, so the endpoint appears to not 
 
 ### E2E Testing with Feature Flags
 
-When writing E2E tests for flagged features:
+When writing E2E tests for flagged features, set the admin token via environment variable:
+```bash
+export CYPRESS_UNLEASH_ADMIN_TOKEN='*:*.unleash-admin-token'
+```
 
 ```typescript
 // e2e/cypress/e2e/flagged-feature.cy.ts
