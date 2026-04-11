@@ -12,6 +12,9 @@ Kubernetes-native AI automation platform that orchestrates agentic sessions thro
 - `components/runners/ambient-runner/` - Python runner executing Claude Code CLI in Job pods
 - `components/ambient-cli/` - Go CLI (`acpctl`), manages agentic sessions from the command line
 - `components/public-api/` - Stateless HTTP gateway, proxies to backend (no direct K8s access)
+- `components/ambient-api-server/` - Go REST API microservice (rh-trex-ai framework), PostgreSQL-backed
+- `components/ambient-sdk/` - Go + Python client SDK for the platform's public REST API
+- `components/open-webui-llm/` - Open WebUI LLM integration
 - `components/manifests/` - Kustomize-based deployment manifests and overlays
 - `e2e/` - Cypress end-to-end tests
 - `docs/` - Astro Starlight documentation site
@@ -41,6 +44,9 @@ make deploy                   # Deploy to cluster
 make test                     # Run tests
 make lint                     # Lint code
 make kind-up                  # Start local Kind cluster
+make kind-rebuild              # Rebuild images + redeploy to running cluster
+make kind-login                # Set kubectl context + configure acpctl
+make dev-bootstrap             # Bootstrap developer workspace
 make test-e2e-local           # Run E2E tests against Kind
 make benchmark                # Run component benchmark harness
 ```
@@ -92,60 +98,19 @@ Benchmark notes:
 
 ## Pre-commit Hooks
 
-The project uses the [pre-commit](https://pre-commit.com/) framework to run linters locally before every commit. Configuration lives in `.pre-commit-config.yaml`.
-
-### Install
-
-```bash
-make setup-hooks
-```
-
-### What Runs
-
-**On every `git commit`:**
-
-| Hook | Scope |
-|------|-------|
-| trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key | All files |
-| ruff-format, ruff (check + fix) | Python (runners, scripts) |
-| gofmt, go vet, golangci-lint | Go (backend, operator, public-api — per-module) |
-| eslint | Frontend TypeScript/JavaScript |
-| branch-protection | Blocks commits to main/master/production |
-
-**On every `git push`:**
-
-| Hook | Scope |
-|------|-------|
-| push-protection | Blocks pushes to main/master/production |
-
-### Run Manually
-
-```bash
-make lint                                    # All hooks, all files
-pre-commit run gofmt-check --all-files       # Single hook
-pre-commit run --files path/to/file.go       # Single file
-```
-
-### Skip Hooks
-
-```bash
-git commit --no-verify    # Skip pre-commit hooks
-git push --no-verify      # Skip pre-push hooks
-```
-
-### Notes
+Configured in `.pre-commit-config.yaml`. Install: `make setup-hooks`. Run all: `make lint`.
 
 - Go and ESLint wrappers (`scripts/pre-commit/`) skip gracefully if the toolchain is not installed
-- `tsc --noEmit` and `npm run build` are **not** included (slow; CI gates on them)
-- Branch/push protection scripts remain in `scripts/git-hooks/` and are invoked by pre-commit
+- `tsc --noEmit` and `npm run build` are **not** in pre-commit (slow; CI gates on them)
+- Branch/push protection blocks commits and pushes to main/master/production
 
 ## Testing
 
-- **Frontend unit tests**: `cd components/frontend && npx vitest run --coverage` (466 tests, ~74% coverage). See `components/frontend/README.md`.
-- **E2E tests**: `cd e2e && npx cypress run --browser chrome` (58 tests, mock SDK). See `e2e/README.md`.
+- **Frontend unit tests**: `cd components/frontend && npx vitest run --coverage`. See `components/frontend/README.md`.
+- **E2E tests**: `cd e2e && npx cypress run --browser chrome`. See `e2e/README.md`.
 - **Runner tests**: `cd components/runners/ambient-runner && python -m pytest tests/`
 - **Backend tests**: `cd components/backend && make test`. See `components/backend/TEST_GUIDE.md`.
 
-## More Info
+## Convention Authority
 
-See [BOOKMARKS.md](BOOKMARKS.md) for architecture decisions, development context, code patterns, and component-specific guides.
+This file and [BOOKMARKS.md](BOOKMARKS.md) are the authoritative source of project conventions. The [ACP Constitution](.specify/memory/constitution.md) covers spec-kit-specific governance (commit discipline thresholds, context engineering, amendment process) but defers to this file for shared conventions. If they conflict, this file wins. Spec-kit is optional tooling, not mandatory.
