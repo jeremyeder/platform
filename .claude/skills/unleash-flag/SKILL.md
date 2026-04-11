@@ -153,7 +153,7 @@ For endpoints that should be entirely hidden behind a flag, create a middleware 
 // routes.go — gate an entire route group
 flagged := router.Group("/api/v1/feature")
 flagged.Use(func(c *gin.Context) {
-    if !FeatureEnabledForRequest(c, "category.feature.enabled") {
+    if !handlers.FeatureEnabledForRequest(c, "category.feature.enabled") {
         c.AbortWithStatus(http.StatusNotFound)
         return
     }

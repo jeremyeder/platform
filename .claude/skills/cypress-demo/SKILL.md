@@ -55,7 +55,7 @@ Create `e2e/cypress/e2e/<feature-name>-demo.cy.ts` using the helpers below.
 
 #### Required helpers
 
-Copy the demo helpers (cursor, caption, click ripple, timing constants) from the reference implementation at `e2e/cypress/e2e/chatbox-demo.cy.ts` into each new demo file. The helpers are: `caption()`, `clearCaption()`, `initCursor()`, `moveTo()`, `moveToText()`, `clickEffect()`, `cursorClickText()`, plus timing constants (`LONG`, `PAUSE`, `SHORT`, `TYPE_DELAY`).
+Copy the demo helpers (cursor, caption, click ripple, timing constants) from the reference implementation at `e2e/cypress/e2e/sessions.cy.ts` into each new demo file. The helpers are: `caption()`, `clearCaption()`, `initCursor()`, `moveTo()`, `moveToText()`, `clickEffect()`, `cursorClickText()`, plus timing constants (`LONG`, `PAUSE`, `SHORT`, `TYPE_DELAY`).
 
 ### 4. Key patterns
 
@@ -77,4 +77,4 @@ npx cypress run --no-runner-ui --spec "cypress/e2e/<name>-demo.cy.ts"
 
 ### 6. Reference implementation
 
-See `e2e/cypress/e2e/chatbox-demo.cy.ts` for a complete working example.
+See `e2e/cypress/e2e/sessions.cy.ts` for a complete working example.

@@ -37,7 +37,7 @@ Cross-reference each create call with `OwnerReferences` in the same function. Se
 
 - `errors.IsNotFound` → return nil (resource deleted, don't retry)
 - Transient errors → return error (triggers requeue with backoff)
-- Terminal errors → update CR status to "Error", return nil
+- Terminal errors → update CR status to "Failed", return nil
 
 ### O3: SecurityContext on Job pod specs (Critical)
 

@@ -48,12 +48,14 @@ Based on the established integration pattern (Jira, CodeRabbit, Google Drive), g
 
 | File | Purpose | Template |
 |------|---------|----------|
-| `components/frontend/src/components/integrations/{provider}-connection-card.tsx` | Integration card UI | Follow `jira-connection-card.tsx` |
-| `components/frontend/src/services/api/{provider}-auth.ts` | API client | Follow `jira-auth.ts` |
-| `components/frontend/src/services/queries/use-{provider}.ts` | React Query hooks | Follow `use-jira.ts` |
-| `components/frontend/src/app/api/auth/{provider}/route.ts` | Next.js proxy route | Follow Jira auth proxy |
+| `components/frontend/src/components/integrations/{provider}-connection-card.tsx` | Integration card UI | Follow existing integration card (e.g., Jira) |
+| `components/frontend/src/services/api/{provider}-auth.ts` | API client | Follow existing auth service pattern |
+| `components/frontend/src/services/queries/use-{provider}.ts` | React Query hooks | Follow existing query hook pattern |
+| `components/frontend/src/app/api/auth/{provider}/route.ts` | Next.js proxy route | Follow existing auth proxy |
 | `components/frontend/src/components/integrations/IntegrationsClient.tsx` | Add card import | Update imports + render |
 | `components/frontend/src/components/integrations/integrations-panel.tsx` | Add to panel | Update panel |
+
+> **Note:** Before scaffolding, verify the reference files exist by checking `components/frontend/src/components/integrations/` and `components/frontend/src/services/`. File names may differ from examples above.
 
 ### Runner Files
 

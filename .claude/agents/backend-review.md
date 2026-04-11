@@ -89,7 +89,7 @@ Should use `%w` for error wrapping to preserve the error chain.
 ### B8: Files under 400 lines (Minor)
 
 ```bash
-find components/backend/handlers/ -name "*.go" -not -name "*_test.go" | xargs wc -l | sort -rn
+find components/backend/handlers/ -name "*.go" -not -name "*_test.go" -print0 | xargs -0 wc -l | sort -rn
 ```
 
 Flag files exceeding 400 lines. Note: `sessions.go` is a known exception.

@@ -32,6 +32,7 @@ Read all of the following files to build your review context. Do not skip any.
 5. `components/backend/K8S_CLIENT_PATTERNS.md` (user token vs service account)
 6. `components/backend/ERROR_PATTERNS.md` (consistent error patterns)
 7. `components/frontend/REACT_QUERY_PATTERNS.md` (data fetching patterns)
+8. `components/operator/DEVELOPMENT.md` (K8s operator, reconciliation, OwnerReferences)
 
 ### 2. Identify Changes to Review
 
@@ -94,7 +95,7 @@ Evaluate every changed file against the loaded standards. Apply ALL relevant che
 ### 5. Produce Review Report
 
 ```markdown
-# Code Review
+# Claude Code Review
 
 ## Summary
 [1-3 sentence overview]
