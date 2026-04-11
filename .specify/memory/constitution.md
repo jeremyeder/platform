@@ -1,7 +1,15 @@
 <!--
 Sync Impact Report - Constitution Update
-Version: 1.0.0
-Last Updated: 2025-11-13
+Version: 1.1.0
+Last Updated: 2026-04-10
+
+Changelog (v1.1.0):
+  - CLAUDE.md + BOOKMARKS.md declared authoritative for project conventions
+  - Removed duplicated Development Standards (Go, Frontend, Python, Naming) — now defers to CLAUDE.md/BOOKMARKS.md
+  - Removed duplicated Pre-Deployment Validation commands — now defers to CLAUDE.md
+  - Updated Governance/Compliance: removed "Constitution supersedes all" language
+  - Added Authority section establishing CLAUDE.md precedence for shared conventions
+  - Kept all 10 core principles, Production Requirements, and spec-kit governance
 
 Changelog (v1.0.0):
   - RATIFIED: Constitution officially ratified and adopted
@@ -255,107 +263,12 @@ Each commit MUST be atomic, reviewable, and independently testable:
 
 ## Development Standards
 
-### Go Code (Backend & Operator)
-
-**Formatting**:
-
-- Run `gofmt -w .` before committing
-- Use `golangci-lint run` for comprehensive linting
-- Run `go vet ./...` to detect suspicious constructs
-
-**Error Handling**: See Principle III: Type Safety & Error Handling
-
-**Kubernetes Client Patterns**:
-
-- User operations: `GetK8sClientsForRequest(c)`
-- Service account: ONLY for CR writes and token minting
-- Status updates: Use `UpdateStatus` subresource
-- Watch loops: Reconnect on channel close with backoff
-
-### Frontend Code (NextJS)
-
-**UI Components**:
-
-- Use Shadcn UI components from `@/components/ui/*`
-- Use `type` instead of `interface` for type definitions
-- All buttons MUST show loading states during async operations
-- All lists MUST have empty states
-
-**Data Operations**:
-
-- Use React Query hooks from `@/services/queries/*`
-- All mutations MUST invalidate relevant queries
-- No direct `fetch()` calls in components
-
-**File Organization**:
-
-- Colocate single-use components with pages
-- All routes MUST have `page.tsx`, `loading.tsx`, `error.tsx`
-- Components over 200 lines MUST be broken down
-
-### Python Code (Runner)
-
-**Environment**:
-
-- ALWAYS use virtual environments (`python -m venv venv` or `uv venv`)
-- Prefer `uv` over `pip` for package management
-
-**Formatting**:
-
-- Use `black` with 88 character line length
-- Use `isort` with black profile
-- Run linters before committing
-
-### Naming & Legacy Migration
-
-**Legacy Naming (vteam)**:
-
-The project was renamed from vTeam to Ambient Code Platform (ACP). Use "ACP" in all new code, docs, and UI text.
-
-**DO NOT rename without explicit instruction**:
-
-- Kubernetes API group: `vteam.ambient-code`
-- Custom Resource Definitions (CRD kinds)
-- Container image names: `vteam_frontend`, `vteam_backend`, etc.
-- Kubernetes resource names: deployments, services, routes
-- Environment variables referenced in deployment configs
-
-These retain `vteam` for backward compatibility. Renaming requires coordinated migration across deployments and is only done when explicitly instructed.
-
-## Deployment & Operations
-
-### Pre-Deployment Validation
-
-**Go Components**:
-
-```bash
-gofmt -l .
-go vet ./...
-golangci-lint run
-make test
-```
-
-**Frontend**:
-
-```bash
-npm run lint
-npm run build  # Must pass with 0 errors, 0 warnings
-```
-
-**Container Security**:
-
-- Set SecurityContext on all Job pods
-- Drop all capabilities by default
-- Use non-root users where possible
+Per-language conventions (Go formatting, frontend patterns, Python tooling), build commands, pre-deployment validation, and naming/legacy migration rules are maintained in [`/CLAUDE.md`](/CLAUDE.md) and [`/BOOKMARKS.md`](/BOOKMARKS.md). Those files are the authoritative source — do not duplicate them here.
 
 ### Production Requirements
 
-**Security**: Apply Principle II security requirements. Additionally: Scan container images for vulnerabilities before deployment.
-
-**Monitoring**: Implement Principle VI observability requirements in production environment. Additionally: Set up centralized logging and alerting infrastructure.
-
-**Scaling**:
-
+- Scan container images for vulnerabilities before deployment
+- Set up centralized logging and alerting infrastructure
 - Configure Horizontal Pod Autoscaling based on CPU/memory
 - Set appropriate resource requests and limits
 - Plan for job concurrency and queue management
@@ -378,20 +291,13 @@ npm run build  # Must pass with 0 errors, 0 warnings
 - **MINOR**: New principle/section added or materially expanded guidance
 - **PATCH**: Clarifications, wording, typo fixes, non-semantic refinements
 
+### Authority
+
+[`/CLAUDE.md`](/CLAUDE.md) and [`/BOOKMARKS.md`](/BOOKMARKS.md) are the authoritative source of project conventions. This constitution covers spec-kit-specific governance (principles, commit discipline, amendment process) and defers to those files for shared conventions. If they conflict, CLAUDE.md wins.
+
 ### Compliance
 
-- All pull requests MUST verify constitution compliance
-- Pre-commit checklists MUST be followed for backend, frontend, and operator code
+- All pull requests MUST verify constitution compliance for spec-kit-governed concerns
 - Complexity violations MUST be justified in implementation plans
-- Constitution supersedes all other practices and guidelines
 
-### Development Guidance
-
-Runtime development guidance is maintained in:
-
-- `/CLAUDE.md` for Claude Code development
-- Component-specific README files
-- MkDocs documentation in `/docs`
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.1.0 | **Ratified**: 2025-11-13 | **Last Amended**: 2026-04-10
