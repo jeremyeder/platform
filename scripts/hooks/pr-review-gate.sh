@@ -131,8 +131,14 @@ if command -v coderabbit &>/dev/null; then
 
     CR_OUTPUT=$(coderabbit review --agent --base "$BASE_BRANCH" 2>&1 || true)
 
-    if echo "$CR_OUTPUT" | grep -qiE 'unauthorized|rate.limit|auth.*fail|403'; then
-        echo "PR Review Gate: CodeRabbit skipped (auth/rate-limit)" >&2
+    # Parse structured error types from --agent JSON output
+    CR_ERROR_TYPE=$(echo "$CR_OUTPUT" | jq -r 'select(.type == "error") | .errorType' 2>/dev/null || true)
+
+    if [ "$CR_ERROR_TYPE" = "rate_limit" ]; then
+        CR_WAIT=$(echo "$CR_OUTPUT" | jq -r 'select(.type == "error") | .metadata.waitTime // "unknown"' 2>/dev/null || true)
+        echo "PR Review Gate: CodeRabbit rate-limited (wait: $CR_WAIT)" >&2
+    elif echo "$CR_OUTPUT" | grep -qiE 'unauthorized|auth.*fail|403'; then
+        echo "PR Review Gate: CodeRabbit skipped (auth issue)" >&2
     elif [ -n "$CR_OUTPUT" ]; then
         BLOCKING=$(echo "$CR_OUTPUT" | jq -r \
             '.findings[]? | select(.severity == "error") | "  \(.file):\(.line) — \(.message)"' \
