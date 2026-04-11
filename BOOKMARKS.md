@@ -4,6 +4,7 @@ Progressive disclosure for task-specific documentation and references.
 
 ## Table of Contents
 
+- [Governance](#governance)
 - [Architecture Decisions](#architecture-decisions)
 - [Development Context](#development-context)
 - [Code Patterns](#code-patterns)
@@ -14,6 +15,22 @@ Progressive disclosure for task-specific documentation and references.
 - [Design Documents](#design-documents)
 - [Dependency Automation](#dependency-automation)
 - [Amber Automation](#amber-automation)
+
+---
+
+## Governance
+
+### [ACP Constitution](.specify/memory/constitution.md)
+
+10 core principles governing all platform development: K8s-native architecture, security & multi-tenancy, type safety, TDD, component modularity, observability, resource lifecycle, context engineering, data access, and commit discipline.
+
+### [Runner Constitution](.specify/constitutions/runner.md)
+
+Runner-specific principles: version pinning, automated freshness, dependency update procedure, image layer discipline, agent options schema sync, bridge modularity.
+
+### [SDD Preflight Workflow](.github/workflows/sdd-preflight.yml)
+
+CI workflow enforcing constitution compliance on PRs.
 
 ---
 
@@ -42,6 +59,10 @@ Frontend technology stack decisions.
 ### [ADR-0006: Ambient Runner SDK Architecture](docs/internal/adr/0006-ambient-runner-sdk-architecture.md)
 
 Runner SDK design and architecture.
+
+### [ADR-0007: Unleash Feature Flags](docs/internal/adr/0007-unleash-feature-flags.md)
+
+Feature flag management architecture using Unleash with workspace-scoped overrides.
 
 ---
 
@@ -111,6 +132,18 @@ Python runner development, Claude Code SDK integration.
 
 Stateless gateway design, token forwarding, input validation.
 
+### [API Server Guide](components/ambient-api-server/CLAUDE.md)
+
+rh-trex-ai-based REST API, plugin system, code generation, search queries.
+
+### [SDK Guide](components/ambient-sdk/CLAUDE.md)
+
+Go and Python client libraries for the platform's public API.
+
+### [CLI README](components/ambient-cli/README.md)
+
+acpctl CLI for managing agentic sessions from the command line.
+
 ---
 
 ## Development Environment
@@ -126,6 +159,10 @@ OpenShift Local (CRC) setup for OpenShift-specific features.
 ### [Hybrid Development](docs/internal/developer/local-development/hybrid.md)
 
 Run components locally with breakpoint debugging.
+
+### [OpenShift Local Development](docs/internal/developer/local-development/openshift.md)
+
+OpenShift-specific local development setup.
 
 ### [Manifests README](components/manifests/README.md)
 
@@ -182,6 +219,18 @@ How sessions are initialized and configured.
 ### [Spec-Runtime Synchronization](docs/internal/design/spec-runtime-synchronization.md)
 
 Keeping spec and runtime state in sync.
+
+### [Agent Runtime Registry](docs/internal/design/agent-runtime-registry-plan.md)
+
+Agent runtime registry architecture and planning.
+
+### [CLI Runners](docs/internal/design/cli-runners-plan.md)
+
+CLI runner design and implementation plan.
+
+### [Status Update Comparison](docs/internal/design/status-update-comparison.md)
+
+Comparison of status update approaches.
 
 ---
 
