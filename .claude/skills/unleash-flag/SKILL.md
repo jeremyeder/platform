@@ -169,9 +169,14 @@ This returns 404 (not 403) when the flag is off, so the endpoint appears not to 
 
 ### E2E Testing with Feature Flags
 
-When writing E2E tests for flagged features, set the admin token via environment variable:
+When writing E2E tests for flagged features, set the admin token via environment variable (obtain from Unleash UI > API Access, or from deployment secrets):
 ```bash
 export CYPRESS_UNLEASH_ADMIN_TOKEN='<your-unleash-admin-token>'
+```
+
+Alternatively, map it in `e2e/cypress.config.ts`:
+```typescript
+env: { UNLEASH_ADMIN_TOKEN: process.env.CYPRESS_UNLEASH_ADMIN_TOKEN }
 ```
 
 ```typescript
@@ -183,7 +188,7 @@ describe('Flagged Feature', () => {
       method: 'POST',
       url: 'http://localhost:4242/api/admin/projects/default/features/category.feature.enabled/environments/development/on',
       headers: { Authorization: Cypress.env('UNLEASH_ADMIN_TOKEN') },
-    });
+    }).its('status').should('eq', 200);
   });
 
   after(() => {
@@ -192,7 +197,7 @@ describe('Flagged Feature', () => {
       method: 'POST',
       url: 'http://localhost:4242/api/admin/projects/default/features/category.feature.enabled/environments/development/off',
       headers: { Authorization: Cypress.env('UNLEASH_ADMIN_TOKEN') },
-    });
+    }).its('status').should('eq', 200);
   });
 
   it('renders when flag is enabled', () => {
