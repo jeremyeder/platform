@@ -141,14 +141,7 @@ jobs:
           cd components/backend
           go vet ./...
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          working-directory: components/backend
-          args: --timeout=5m
-
-      - name: Run golangci-lint (test build tags)
+      - name: Run golangci-lint (all build tags)
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
