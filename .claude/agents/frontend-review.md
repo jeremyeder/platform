@@ -60,7 +60,7 @@ Use proper types, `unknown`, or generic constraints.
 ### F5: Components under 200 lines (Minor)
 
 ```bash
-find components/frontend/src/ -name "*.tsx" | xargs wc -l | sort -rn | head -20
+find components/frontend/src/ -name "*.tsx" -print0 | xargs -0 wc -l | sort -rn | head -20
 ```
 
 Flag components exceeding 200 lines. Consider splitting.
@@ -80,7 +80,7 @@ Then check each file for `isLoading\|isPending` and `error` references.
 
 ### F7: Single-use components in shared directories (Minor)
 
-Check `components/frontend/src/components/` for components imported only once. These should be colocated with their page in `_components/`.
+Check `components/frontend/src/components/` for components imported only once. These should be co-located with their page in `_components/`.
 
 ### F8: Feature flag on new pages (Major)
 

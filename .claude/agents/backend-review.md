@@ -57,10 +57,10 @@ Must use `unstructured.NestedMap`, `unstructured.NestedString`, etc.
 
 Look for empty error handling blocks:
 ```bash
-grep -rn "if err != nil {" -A1 components/backend/ --include="*.go" | grep -v "_test.go"
+grep -rnP 'if err != nil \{\s*\n\s*\}' components/backend/ --include="*.go" | grep -v "_test.go"
 ```
 
-Flag cases where the block body is empty or only contains a comment.
+Also manually inspect `if err != nil` blocks for cases where the body only contains a comment (no actual handling).
 
 ### B5: No internal error exposure in API responses (Major)
 
@@ -81,7 +81,7 @@ Use `len(token)` for logging, never the token value itself.
 ### B7: Error wrapping with %w (Major)
 
 ```bash
-grep -rn 'fmt.Errorf.*%v.*err' components/backend/ --include="*.go" | grep -v "_test.go"
+grep -rnP 'fmt.Errorf.*%v.*\berr\b' components/backend/ --include="*.go" | grep -v "_test.go"
 ```
 
 Should use `%w` for error wrapping to preserve the error chain.
