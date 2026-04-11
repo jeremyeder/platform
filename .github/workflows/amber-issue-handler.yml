@@ -104,9 +104,10 @@ jobs:
                ---
                🤖 [Ambient Session]($PLATFORM_HOST/projects/$AGENTIC_SESSION_NAMESPACE/sessions/$AGENTIC_SESSION_NAME)
             6. Add the `ambient-code:managed` label to the PR.
-            7. Ensure CI passes. If it fails, investigate and fix.
-            8. Do not merge. Leave the PR open for human review.
-            9. When you comment on the PR, include this footer at the end:
+            7. Add the `ambient-code:self-reviewed` label to the PR.
+            8. Ensure CI passes. If it fails, investigate and fix.
+            9. Do not merge. Leave the PR open for human review.
+            10. When you comment on the PR, include this footer at the end:
                _🤖 [Session]($PLATFORM_HOST/projects/$AGENTIC_SESSION_NAMESPACE/sessions/$AGENTIC_SESSION_NAME)_
           repos: >-
             [{"url": "https://github.com/${{ github.repository }}", "branch": "main"}]
@@ -299,9 +300,10 @@ jobs:
                ---
                🤖 [Ambient Session]($PLATFORM_HOST/projects/$AGENTIC_SESSION_NAMESPACE/sessions/$AGENTIC_SESSION_NAME)
             6. Add the `ambient-code:managed` label to the PR.
-            7. Ensure CI passes. If it fails, investigate and fix.
-            8. Do not merge. Leave the PR open for human review.
-            9. When you comment on the PR, include this footer at the end:
+            7. Add the `ambient-code:self-reviewed` label to the PR.
+            8. Ensure CI passes. If it fails, investigate and fix.
+            9. Do not merge. Leave the PR open for human review.
+            10. When you comment on the PR, include this footer at the end:
                _🤖 [Session]($PLATFORM_HOST/projects/$AGENTIC_SESSION_NAMESPACE/sessions/$AGENTIC_SESSION_NAME)_
           repos: >-
             [{"url": "https://github.com/${{ github.repository }}", "branch": "main"}]
