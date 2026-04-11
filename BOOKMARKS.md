@@ -134,7 +134,7 @@ Stateless gateway design, token forwarding, input validation.
 
 ### [API Server Guide](components/ambient-api-server/CLAUDE.md)
 
-rh-trex-ai-based REST API, plugin system, code generation, search queries.
+rh-trex-ai-based https://github.com/openshift-online/rh-trex-ai REST API, plugin system, code generation, search queries.
 
 ### [SDK Guide](components/ambient-sdk/CLAUDE.md)
 
