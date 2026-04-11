@@ -128,12 +128,11 @@ jobs:
           go run github.com/onsi/ginkgo/v2/ginkgo -r -v --cover --keep-going --github-output=true --tags=test --label-filter=${{ steps.configure.outputs.TEST_LABEL }} --junit-report=${{ env.JUNIT_FILENAME }} --output-dir=reports -- -testNamespace=${{ steps.configure.outputs.DEFAULT_NAMESPACE }}
         continue-on-error: true
 
-      - name: Install Junit2Html plugin and generate report
+      - name: Generate HTML test report
         if: (!cancelled())
         shell: bash
         run: |
-          pip install junit2html
-          junit2html ${{ env.TESTS_DIR }}/reports/${{ env.JUNIT_FILENAME }} ${{ env.TESTS_DIR }}/reports/test-report.html
+          pipx run junit2html ${{ env.TESTS_DIR }}/reports/${{ env.JUNIT_FILENAME }} ${{ env.TESTS_DIR }}/reports/test-report.html
         continue-on-error: true
 
       - name: Configure report name
