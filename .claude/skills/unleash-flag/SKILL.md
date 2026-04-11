@@ -171,7 +171,7 @@ This returns 404 (not 403) when the flag is off, so the endpoint appears not to 
 
 When writing E2E tests for flagged features, set the admin token via environment variable:
 ```bash
-export CYPRESS_UNLEASH_ADMIN_TOKEN='*:*.unleash-admin-token'
+export CYPRESS_UNLEASH_ADMIN_TOKEN='<your-unleash-admin-token>'
 ```
 
 ```typescript
@@ -258,11 +258,12 @@ This means a workspace admin can override the global Unleash state in either dir
 
 Treat flags as technical debt. When a feature is fully rolled out, remove the flag — don't leave it permanently enabled.
 
-**When a feature reaches GA**, create a Jira issue (use `/jira-log`) to track cleanup:
-- Remove all `useWorkspaceFlag` / `useFlag` calls for this flag
-- Remove the flag from `flags.json`
-- Archive and purge the flag in Unleash
-- Remove any ConfigMap overrides in workspace namespaces
+**When a feature reaches GA**, create a Jira issue (use `/jira-log`) to track cleanup in this order:
+1. Verify feature is fully rolled out (all workspaces enabled or no longer need it)
+2. Remove `useWorkspaceFlag` / `useFlag` calls from code and deploy
+3. Remove the flag from `flags.json` and deploy (SyncFlags stops recreating it)
+4. Remove any ConfigMap overrides in workspace namespaces
+5. Archive and purge the flag in Unleash
 
 **Exceptions for long-lived flags:** kill switches for graceful degradation, and debug flags for expensive tracing.
 

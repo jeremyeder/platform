@@ -53,19 +53,19 @@ Job containers must specify resource requirements to prevent unbounded resource 
 // Resource deleted during reconciliation — NOT an error
 if errors.IsNotFound(err) {
     log.Printf("Resource %s/%s deleted, skipping", namespace, name)
-    return nil  // Don't requeue
+    return ctrl.Result{}, nil  // Don't requeue
 }
 
 // Transient error — return error to requeue
 if err != nil {
-    return fmt.Errorf("failed to get object: %w", err)
+    return ctrl.Result{}, fmt.Errorf("failed to get object: %w", err)
 }
 ```
 
 **Key patterns:**
-- `IsNotFound` → return nil (resource gone, no retry)
-- Transient errors → return error (triggers requeue with backoff)
-- Terminal errors → update CR status to "Error", return nil (don't retry)
+- `IsNotFound` → return `ctrl.Result{}, nil` (resource gone, no retry)
+- Transient errors → return `ctrl.Result{}, err` (triggers requeue with backoff)
+- Terminal errors → update CR status to "Failed", return `ctrl.Result{}, nil` (don't retry)
 
 ### Status Updates on Error
 
