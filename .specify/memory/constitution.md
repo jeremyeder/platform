@@ -76,30 +76,15 @@ All features MUST be built using Kubernetes primitives and patterns:
 
 ### II. Security & Multi-Tenancy First
 
-Security and isolation MUST be embedded in every component:
-
-- **Authentication**: All user-facing endpoints MUST use user tokens via `GetK8sClientsForRequest()`
-- **Authorization**: RBAC checks MUST be performed before resource access
-- **Token Security**: NEVER log tokens, API keys, or sensitive headers; use redaction in logs
-- **Multi-Tenancy**: Project-scoped namespaces with strict isolation
-- **Principle of Least Privilege**: Service accounts with minimal permissions
-- **Container Security**: SecurityContext with `AllowPrivilegeEscalation: false`, drop all capabilities
-- **No Fallback**: Backend service account ONLY for CR writes and token minting, never as fallback
+Security and isolation MUST be embedded in every component. User token auth, RBAC, token redaction, project-scoped isolation, least privilege, and container security hardening are all non-negotiable. See CLAUDE.md Critical Context and [Security Standards](.claude/context/security-standards.md) for implementation details.
 
 **Rationale**: Security breaches and privilege escalation destroy trust. Multi-tenant isolation is non-negotiable for enterprise deployment.
 
 ### III. Type Safety & Error Handling (NON-NEGOTIABLE)
 
-Production code MUST follow strict type safety and error handling rules:
+No panics, no `any` types, explicit error wrapping with context. See CLAUDE.md Critical Context and [Error Handling Patterns](.claude/patterns/error-handling.md) for implementation details.
 
-- **No Panic**: FORBIDDEN in handlers, reconcilers, or any production path
-- **Explicit Errors**: Return `fmt.Errorf("context: %w", err)` with wrapped errors
-- **Type-Safe Unstructured**: Use `unstructured.Nested*` helpers, check `found` before using values
-- **Frontend Type Safety**: Zero `any` types without eslint-disable justification
-- **Structured Errors**: Log errors before returning with relevant context (namespace, resource name)
-- **Graceful Degradation**: `IsNotFound` during cleanup is not an error
-
-**Rationale**: Runtime panics crash operator loops and kill services. Type assertions without checks cause nil pointer dereferences. Explicit error handling ensures debuggability and operational stability.
+**Rationale**: Runtime panics crash operator loops and kill services. Explicit error handling ensures debuggability and operational stability.
 
 ### IV. Test-Driven Development
 
@@ -156,14 +141,7 @@ All components MUST support operational visibility:
 
 ### VII. Resource Lifecycle Management
 
-Kubernetes resources MUST have proper lifecycle management:
-
-- **OwnerReferences**: ALWAYS set on child resources (Jobs, Secrets, PVCs, Services)
-- **Controller References**: Use `Controller: true` for primary owner
-- **No BlockOwnerDeletion**: Causes permission issues in multi-tenant environments
-- **Idempotency**: Resource creation MUST check existence first
-- **Cleanup**: Rely on OwnerReferences for cascading deletes
-- **Goroutine Safety**: Exit monitoring goroutines when parent resource deleted
+All child resources MUST have OwnerReferences with cascading deletes. Idempotent creation, no BlockOwnerDeletion, goroutine cleanup on parent deletion. See CLAUDE.md Critical Context for the key rules.
 
 **Rationale**: Resource leaks waste cluster capacity and cause outages. Proper lifecycle management ensures automatic cleanup and prevents orphaned resources.
 
