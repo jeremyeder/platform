@@ -87,65 +87,84 @@ jobs:
       with:
         driver-opts: network=host
 
-    - name: Build component images from PR code
+    - name: Build or pull frontend image
+      if: needs.detect-changes.outputs.frontend == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: components/frontend
+        file: components/frontend/Dockerfile
+        load: true
+        tags: quay.io/ambient_code/vteam_frontend:e2e-test
+        cache-from: |
+          type=gha,scope=frontend-amd64
+          type=gha,scope=e2e-frontend
+        cache-to: type=gha,mode=max,scope=e2e-frontend
+
+    - name: Pull frontend latest (unchanged)
+      if: needs.detect-changes.outputs.frontend != 'true'
       run: |
-        echo "======================================"
-        echo "Building images from PR code..."
-        echo "PR #${{ github.event.pull_request.number }}"
-        echo "SHA: ${{ github.event.pull_request.head.sha }}"
-        echo "======================================"
+        docker pull quay.io/ambient_code/vteam_frontend:latest
+        docker tag quay.io/ambient_code/vteam_frontend:latest quay.io/ambient_code/vteam_frontend:e2e-test
 
-        # Build frontend image (if changed or use latest)
-        if [ "${{ needs.detect-changes.outputs.frontend }}" == "true" ]; then
-          echo "Building frontend (changed)..."
-          docker build -t quay.io/ambient_code/vteam_frontend:e2e-test \
-            -f components/frontend/Dockerfile \
-            components/frontend
-        else
-          echo "Frontend unchanged, pulling latest..."
-          docker pull quay.io/ambient_code/vteam_frontend:latest
-          docker tag quay.io/ambient_code/vteam_frontend:latest quay.io/ambient_code/vteam_frontend:e2e-test
-        fi
+    - name: Build or pull backend image
+      if: needs.detect-changes.outputs.backend == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: components/backend
+        file: components/backend/Dockerfile
+        load: true
+        tags: quay.io/ambient_code/vteam_backend:e2e-test
+        cache-from: |
+          type=gha,scope=backend-amd64
+          type=gha,scope=e2e-backend
+        cache-to: type=gha,mode=max,scope=e2e-backend
 
-        # Build backend image (if changed or use latest)
-        if [ "${{ needs.detect-changes.outputs.backend }}" == "true" ]; then
-          echo "Building backend (changed)..."
-          docker build -t quay.io/ambient_code/vteam_backend:e2e-test \
-            -f components/backend/Dockerfile \
-            components/backend
-        else
-          echo "Backend unchanged, pulling latest..."
-          docker pull quay.io/ambient_code/vteam_backend:latest
-          docker tag quay.io/ambient_code/vteam_backend:latest quay.io/ambient_code/vteam_backend:e2e-test
-        fi
+    - name: Pull backend latest (unchanged)
+      if: needs.detect-changes.outputs.backend != 'true'
+      run: |
+        docker pull quay.io/ambient_code/vteam_backend:latest
+        docker tag quay.io/ambient_code/vteam_backend:latest quay.io/ambient_code/vteam_backend:e2e-test
 
-        # Build operator image (if changed or use latest)
-        if [ "${{ needs.detect-changes.outputs.operator }}" == "true" ]; then
-          echo "Building operator (changed)..."
-          docker build -t quay.io/ambient_code/vteam_operator:e2e-test \
-            -f components/operator/Dockerfile \
-            components/operator
-        else
-          echo "Operator unchanged, pulling latest..."
-          docker pull quay.io/ambient_code/vteam_operator:latest
-          docker tag quay.io/ambient_code/vteam_operator:latest quay.io/ambient_code/vteam_operator:e2e-test
-        fi
+    - name: Build or pull operator image
+      if: needs.detect-changes.outputs.operator == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: components/operator
+        file: components/operator/Dockerfile
+        load: true
+        tags: quay.io/ambient_code/vteam_operator:e2e-test
+        cache-from: |
+          type=gha,scope=operator-amd64
+          type=gha,scope=e2e-operator
+        cache-to: type=gha,mode=max,scope=e2e-operator
 
-        # Build ambient-runner image (if changed or use latest)
-        if [ "${{ needs.detect-changes.outputs.claude-runner }}" == "true" ]; then
-          echo "Building ambient-runner (changed)..."
-          docker build -t quay.io/ambient_code/vteam_claude_runner:e2e-test \
-            -f components/runners/ambient-runner/Dockerfile \
-            components/runners
-        else
-          echo "Claude-runner unchanged, pulling latest..."
-          docker pull quay.io/ambient_code/vteam_claude_runner:latest
-          docker tag quay.io/ambient_code/vteam_claude_runner:latest quay.io/ambient_code/vteam_claude_runner:e2e-test
-        fi
+    - name: Pull operator latest (unchanged)
+      if: needs.detect-changes.outputs.operator != 'true'
+      run: |
+        docker pull quay.io/ambient_code/vteam_operator:latest
+        docker tag quay.io/ambient_code/vteam_operator:latest quay.io/ambient_code/vteam_operator:e2e-test
 
-        echo ""
-        echo "✅ All images ready"
-        docker images | grep e2e-test
+    - name: Build or pull ambient-runner image
+      if: needs.detect-changes.outputs.claude-runner == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: components/runners
+        file: components/runners/ambient-runner/Dockerfile
+        load: true
+        tags: quay.io/ambient_code/vteam_claude_runner:e2e-test
+        cache-from: |
+          type=gha,scope=ambient-runner-amd64
+          type=gha,scope=e2e-ambient-runner
+        cache-to: type=gha,mode=max,scope=e2e-ambient-runner
+
+    - name: Pull ambient-runner latest (unchanged)
+      if: needs.detect-changes.outputs.claude-runner != 'true'
+      run: |
+        docker pull quay.io/ambient_code/vteam_claude_runner:latest
+        docker tag quay.io/ambient_code/vteam_claude_runner:latest quay.io/ambient_code/vteam_claude_runner:e2e-test
+
+    - name: Show built images
+      run: docker images | grep e2e-test
 
     - name: Install kind
       run: |
