@@ -145,6 +145,53 @@ if !FeatureEnabledForRequest(c, "category.feature.enabled") {
 }
 ```
 
+### Backend Middleware Gating
+
+For endpoints that should be entirely hidden behind a flag, use the `requireFeatureFlag()` middleware in `routes.go`:
+
+```go
+// routes.go — gate an entire route group
+flagged := router.Group("/api/v1/feature")
+flagged.Use(requireFeatureFlag("category.feature.enabled"))
+{
+    flagged.GET("/resource", handlers.ListResource)
+    flagged.POST("/resource", handlers.CreateResource)
+}
+```
+
+This returns 404 (not 403) when the flag is off, so the endpoint appears to not exist. Use this for features that shouldn't even be discoverable until enabled.
+
+### E2E Testing with Feature Flags
+
+When writing E2E tests for flagged features:
+
+```typescript
+// e2e/cypress/e2e/flagged-feature.cy.ts
+describe('Flagged Feature', () => {
+  before(() => {
+    // Enable the flag via Unleash admin API
+    cy.request({
+      method: 'POST',
+      url: 'http://localhost:4242/api/admin/projects/default/features/category.feature.enabled/environments/development/on',
+      headers: { Authorization: '*:*.unleash-admin-token' },
+    });
+  });
+
+  after(() => {
+    // Disable the flag after tests
+    cy.request({
+      method: 'POST',
+      url: 'http://localhost:4242/api/admin/projects/default/features/category.feature.enabled/environments/development/off',
+      headers: { Authorization: '*:*.unleash-admin-token' },
+    });
+  });
+
+  it('renders when flag is enabled', () => {
+    // ... test the feature
+  });
+});
+```
+
 ## 3. Update Tests
 
 Any component that now calls `useWorkspaceFlag` or `useFlag` needs its tests updated.
@@ -197,10 +244,16 @@ This means a workspace admin can override the global Unleash state in either dir
 |-------|--------|
 | **Create** | Add to `flags.json`, gate frontend, assign ownership |
 | **Rollout** | Workspace admins enable per-workspace via settings UI |
-| **GA** | Remove flag checks from code, remove from `flags.json` |
+| **GA** | Remove flag checks from code, remove from `flags.json`, create Jira for cleanup tracking |
 | **Cleanup** | Archive flag in Unleash, remove stale ConfigMap overrides |
 
 Treat flags as technical debt. When a feature is fully rolled out, remove the flag — don't leave it permanently enabled.
+
+**When a feature reaches GA**, create a Jira issue (use `/jira-log`) to track cleanup:
+- Remove all `useWorkspaceFlag` / `useFlag` calls for this flag
+- Remove the flag from `flags.json`
+- Archive and purge the flag in Unleash
+- Remove any ConfigMap overrides in workspace namespaces
 
 **Exceptions for long-lived flags:** kill switches for graceful degradation, and debug flags for expensive tracing.
 

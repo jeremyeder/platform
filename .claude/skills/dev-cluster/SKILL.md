@@ -1,6 +1,11 @@
 ---
 name: dev-cluster
-description: Manages Ambient Code Platform development clusters (kind) for testing changes
+description: >
+  Manages Ambient Code Platform development clusters (kind) for testing changes
+  locally. Use when deploying PRs to kind, bringing up local clusters, rebuilding
+  images, troubleshooting pod issues, or running benchmarks. Triggers on: "test
+  in kind", "deploy locally", "kind cluster", "rebuild images", "pod crashing",
+  "bring up cluster", "kind-up", "dev environment", "local dev".
 ---
 
 # Development Cluster Management Skill

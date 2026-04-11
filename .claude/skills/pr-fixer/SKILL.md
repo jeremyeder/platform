@@ -1,6 +1,10 @@
 ---
 name: pr-fixer
-description: Trigger the PR Fixer GitHub Actions workflow to automatically fix a pull request (rebase, address review comments, run lints/tests, push fixes). Use when user types /pr-fixer <number>.
+description: >
+  Trigger the PR Fixer GitHub Actions workflow to automatically fix a pull request
+  (rebase, address review comments, run lints/tests, push fixes). Use when user
+  types /pr-fixer <number>, says "fix PR", "run pr-fixer", "address PR comments",
+  or "auto-fix pull request".
 ---
 
 # PR Fixer Skill
@@ -15,17 +19,22 @@ The PR number is required. Example: `/pr-fixer 1234`
 
 ## What It Does
 
-1. **Validate prerequisites**
+1. **Pre-flight checks**
+   - Verify the PR exists and is open: `gh pr view <N> --repo <owner/repo> --json state -q .state`
+   - If PR is closed/merged, abort with: "PR #N is already <state>. Nothing to fix."
+   - If PR doesn't exist, abort with: "PR #N not found in <owner/repo>."
+
+2. **Validate prerequisites**
    - Confirm `gh` CLI is authenticated (`gh auth status`)
    - Detect the repo from the local git remote (`gh repo view --json nameWithOwner -q .nameWithOwner`)
    - Confirm the repo has a `pr-fixer.yml` workflow
 
-2. **Dispatch the workflow**
+3. **Dispatch the workflow**
    ```bash
    gh workflow run pr-fixer.yml -f pr_number=<N> --repo <owner/repo>
    ```
 
-3. **Locate the triggered run**
+4. **Locate the triggered run**
    - Wait a few seconds for the run to register
    - Find it via:
      ```bash
@@ -33,7 +42,7 @@ The PR number is required. Example: `/pr-fixer 1234`
      ```
    - Match the most recent run created after dispatch
 
-4. **Print the run URL** immediately so the user has it:
+5. **Print the run URL** immediately so the user has it:
    ```
    PR Fixer dispatched for PR #<N>
    Run: https://github.com/<owner/repo>/actions/runs/<run-id>
@@ -42,8 +51,9 @@ The PR number is required. Example: `/pr-fixer 1234`
    Monitoring in background — you'll be notified when it completes.
    ```
 
-5. **Spawn a background agent** to monitor the run:
+6. **Spawn a background agent** to monitor the run (30-minute timeout):
    - Poll `gh run view <run-id> --repo <owner/repo> --json status,conclusion` every 30 seconds
+   - If 30 minutes elapse without completion, notify: "PR Fixer timed out after 30 minutes. Check the run manually."
    - When the run reaches a terminal state, notify with:
      - Run conclusion (success/failure/cancelled)
      - Session name and phase (parse from `gh run view <run-id> --repo <owner/repo> --json jobs` — look for the "Session summary" step output)
