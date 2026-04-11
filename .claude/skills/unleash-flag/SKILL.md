@@ -165,7 +165,7 @@ flagged.Use(func(c *gin.Context) {
 }
 ```
 
-This returns 404 (not 403) when the flag is off, so the endpoint appears to not exist. Use this for features that shouldn't even be discoverable until enabled.
+This returns 404 (not 403) when the flag is off, so the endpoint appears not to exist. Use this for features that shouldn't even be discoverable until enabled.
 
 ### E2E Testing with Feature Flags
 

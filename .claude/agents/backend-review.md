@@ -40,7 +40,7 @@ In `components/backend/handlers/`:
 - Acceptable uses: after RBAC validation for writes, token minting, cleanup
 
 ```bash
-grep -rn "DynamicClient\.Resource\|K8sClient\." components/backend/handlers/ --include="*.go" | grep -v "_test.go"
+grep -rnE "DynamicClient\.|K8sClient\." components/backend/handlers/ --include="*.go" | grep -v "_test.go"
 ```
 
 Cross-reference each match against the decision tree in `K8S_CLIENT_PATTERNS.md`.
@@ -57,7 +57,7 @@ Must use `unstructured.NestedMap`, `unstructured.NestedString`, etc.
 
 Look for empty error handling blocks:
 ```bash
-grep -rnP 'if err != nil \{\s*\n\s*\}' components/backend/ --include="*.go" | grep -v "_test.go"
+rg -nUP 'if err != nil \{\s*\n\s*\}' --type go --glob '!*_test.go' components/backend/
 ```
 
 Also manually inspect `if err != nil` blocks for cases where the body only contains a comment (no actual handling).
@@ -65,7 +65,7 @@ Also manually inspect `if err != nil` blocks for cases where the body only conta
 ### B5: No internal error exposure in API responses (Major)
 
 ```bash
-grep -rn 'gin.H{"error":.*fmt\.Sprintf\|gin.H{"error":.*err\.' components/backend/handlers/ --include="*.go"
+grep -rn 'gin.H{"error":.*fmt\.Sprintf\|gin.H{"error":.*err\.' components/backend/handlers/ --include="*.go" | grep -v "_test.go"
 ```
 
 API responses should use generic messages. Detailed errors go to logs.

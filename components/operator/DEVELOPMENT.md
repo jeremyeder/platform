@@ -73,7 +73,7 @@ When an operation fails, always update the CR status before returning:
 
 ```go
 updateAgenticSessionStatus(namespace, name, map[string]interface{}{
-    "phase":   "Error",
+    "phase":   "Failed",
     "message": fmt.Sprintf("Failed to create job: %v", err),
 })
 ```
