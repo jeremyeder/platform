@@ -9,6 +9,9 @@ on:
   push:
     branches: [ main ]
 
+env:
+  KIND_VERSION: "v0.27.0"
+
 concurrency:
   group: e2e-tests-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
@@ -166,11 +169,23 @@ jobs:
     - name: Show built images
       run: docker images | grep e2e-test
 
+    - name: Cache kind binary
+      uses: actions/cache@v4
+      with:
+        path: ~/k8s-tools/kind
+        key: kind-${{ runner.os }}-${{ env.KIND_VERSION }}
+
     - name: Install kind
       run: |
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
-        chmod +x ./kind
-        sudo mv ./kind /usr/local/bin/kind
+        mkdir -p ~/k8s-tools
+        if [[ ! -f ~/k8s-tools/kind ]]; then
+          echo "Downloading kind $KIND_VERSION..."
+          curl -sLo ~/k8s-tools/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x ~/k8s-tools/kind
+        else
+          echo "Using cached kind"
+        fi
+        sudo cp ~/k8s-tools/kind /usr/local/bin/kind
         kind version
 
     - name: Setup kind cluster
