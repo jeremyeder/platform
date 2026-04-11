@@ -28,7 +28,7 @@ Load these files before running checks:
 ### O1: OwnerReferences on child resources (Blocker)
 
 ```bash
-grep -rn "Jobs\|Secrets\|PersistentVolumeClaims" components/operator/ --include="*.go" | grep -i "create"
+grep -rn "Job\|Secret\|PersistentVolumeClaim" components/operator/ --include="*.go" | grep -i "create"
 ```
 
 Cross-reference each create call with `OwnerReferences` in the same function. See `DEVELOPMENT.md` for the required pattern.

@@ -16,7 +16,7 @@ Generate the complete file set for a new integration, endpoint, or feature flag.
 
 ## Usage
 
-```
+```bash
 /scaffold integration <name>    # Full integration scaffold
 /scaffold endpoint <name>       # API endpoint scaffold
 /scaffold feature-flag <name>   # Feature flag scaffold (delegates to /unleash-flag)
@@ -101,7 +101,7 @@ func List{Resource}(c *gin.Context) {
     projectName := c.Param("projectName")
 
     reqK8s, reqDyn := GetK8sClientsForRequest(c)
-    if reqK8s == nil {
+    if reqK8s == nil || reqDyn == nil {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or missing token"})
         return
     }

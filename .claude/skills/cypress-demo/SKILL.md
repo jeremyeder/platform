@@ -14,7 +14,7 @@ Create a polished Cypress demo test that records a human-paced video walkthrough
 
 ## Usage
 
-```
+```bash
 /cypress-demo                          # Auto-detect features from branch diff
 /cypress-demo chat input refactoring   # Describe what to demo
 ```

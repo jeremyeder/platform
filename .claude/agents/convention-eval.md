@@ -91,7 +91,9 @@ Load these before running checks:
 
 - Each check: Pass (1) or Fail (0)
 - Category score: passes / total
-- Overall score: weighted average across categories
+- Overall score:
+  - Full scope: weighted average across all categories
+  - Scoped runs: renormalize weights to selected categories (e.g., backend-only uses 100% backend weight)
 
 ## Output Format
 

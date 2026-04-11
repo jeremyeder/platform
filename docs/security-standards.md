@@ -1,6 +1,6 @@
 # Security Standards Quick Reference
 
-> Part of [CLAUDE.md Critical Conventions](CLAUDE.md#critical-conventions)
+> Part of [CLAUDE.md Critical Conventions](../CLAUDE.md#critical-conventions)
 
 **When to load:** Working on authentication, authorization, RBAC, or handling sensitive data
 

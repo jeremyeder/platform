@@ -24,7 +24,7 @@ OwnerReferences: []metav1.OwnerReference{
         Name:               obj.GetName(),
         UID:                obj.GetUID(),
         Controller:         boolPtr(true),
-        BlockOwnerDeletion: boolPtr(true),
+        // BlockOwnerDeletion omitted — causes permission issues in constrained RBAC environments
     },
 },
 ```
@@ -86,8 +86,8 @@ Use the context from the reconciliation request, not `context.TODO()`:
 // Bad
 ctx := context.TODO()
 
-// Good — use the context passed to the reconciler
-ctx := req.Context()
+// Good — use the ctx parameter from the Reconcile(ctx, req) signature
+// The ctx is already provided as the first argument to Reconcile and phase handlers
 ```
 
 ### No panic() in Production

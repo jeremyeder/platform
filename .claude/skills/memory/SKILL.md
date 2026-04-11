@@ -15,7 +15,7 @@ Manage the auto-memory system for the Ambient Code Platform project.
 
 ## Usage
 
-```
+```text
 /memory                    # Show summary of all memories
 /memory search <query>     # Search for a topic
 /memory audit              # Check for stale/duplicate memories
@@ -34,9 +34,11 @@ Parse the subcommand from `$ARGUMENTS`. Default to summary if empty.
 ## Memory Location
 
 All memory files live at:
+```text
+$HOME/.claude/projects/<project-slug>/memory/
 ```
-/Users/jeder/.claude/projects/-Users-jeder-repos-platform/memory/
-```
+
+Use the active project's slug (the repo path with `/` replaced by `-`).
 
 The index file is `MEMORY.md` in that directory.
 

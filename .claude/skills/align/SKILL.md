@@ -15,7 +15,7 @@ Measure codebase adherence to documented conventions. Produces a scored report a
 
 ## Usage
 
-```
+```text
 /align                # Full codebase scan
 /align backend        # Backend checks only
 /align frontend       # Frontend checks only
@@ -44,10 +44,10 @@ $ARGUMENTS
 
 Use the Agent tool to dispatch the convention-eval agent:
 
-```
+```javascript
 Agent({
   description: "Convention alignment check",
-  prompt: "You are the convention-eval agent. Read your definition at .claude/agents/convention-eval.md, then run a [scope] convention alignment check. Scope: [full|backend|frontend|operator|runner|security]. Load all context files listed in your definition, run the checks, and report findings in the standard output format with scores."
+  prompt: "You are the convention-eval agent. Read your definition at .claude/agents/convention-eval.md, then run a ${scope} convention alignment check. Scope: ${scope} (one of: full, backend, frontend, operator, runner, security). Load all context files listed in your definition, run the checks, and report findings in the standard output format with scores."
 })
 ```
 

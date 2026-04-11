@@ -29,7 +29,7 @@ Handlers must use `GetK8sClientsForRequest(c)` for user-initiated operations. Se
 
 ### S2: RBAC before resource access (Critical)
 
-`SelfSubjectAccessReview` should precede write operations.
+`SelfSubjectAccessReview` (or equivalent authz check) should precede user-scoped resource access.
 
 ### S3: Token redaction in all outputs (Blocker)
 

@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-# Check for uncommitted changes (staged or unstaged)
-if git diff --quiet HEAD 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
+# Check for any working tree changes (staged, unstaged, or untracked)
+if [[ -z "$(git status --porcelain 2>/dev/null)" ]]; then
   exit 0
 fi
 

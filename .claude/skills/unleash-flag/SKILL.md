@@ -147,12 +147,18 @@ if !FeatureEnabledForRequest(c, "category.feature.enabled") {
 
 ### Backend Middleware Gating
 
-For endpoints that should be entirely hidden behind a flag, use the `requireFeatureFlag()` middleware in `routes.go`:
+For endpoints that should be entirely hidden behind a flag, create a middleware in `routes.go` that checks `FeatureEnabled()` and returns 404 when the flag is off:
 
 ```go
 // routes.go — gate an entire route group
 flagged := router.Group("/api/v1/feature")
-flagged.Use(requireFeatureFlag("category.feature.enabled"))
+flagged.Use(func(c *gin.Context) {
+    if !FeatureEnabled("category.feature.enabled") {
+        c.AbortWithStatus(http.StatusNotFound)
+        return
+    }
+    c.Next()
+})
 {
     flagged.GET("/resource", handlers.ListResource)
     flagged.POST("/resource", handlers.CreateResource)

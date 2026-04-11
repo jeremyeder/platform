@@ -48,7 +48,7 @@ Cross-reference each match against the decision tree in `K8S_CLIENT_PATTERNS.md`
 ### B3: No direct type assertions on unstructured (Critical)
 
 ```bash
-grep -rn 'Object\[".*"\]\.\(' components/backend/ --include="*.go" | grep -v "_test.go"
+grep -rnE 'Object\["[^"]+"\]\.\(' components/backend/ --include="*.go" | grep -v "_test.go"
 ```
 
 Must use `unstructured.NestedMap`, `unstructured.NestedString`, etc.

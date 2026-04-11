@@ -36,7 +36,7 @@ Must use Shadcn UI components from `@/components/ui/`.
 ### F2: No manual fetch() in components (Critical)
 
 ```bash
-grep -rn "fetch(" components/frontend/src/app/ components/frontend/src/components/ --include="*.tsx" --include="*.ts" | grep -v "services/api/"
+grep -rn "fetch(" components/frontend/src/app/ components/frontend/src/components/ --include="*.tsx" --include="*.ts" | grep -v "services/api/\|src/app/api/"
 ```
 
 Use React Query hooks from `@/services/queries/`.
