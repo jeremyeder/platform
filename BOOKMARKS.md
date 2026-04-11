@@ -43,6 +43,10 @@ Frontend technology stack decisions.
 
 Runner SDK design and architecture.
 
+### [ADR-0008: Automate Code Reviews](docs/internal/adr/0008-automate-code-reviews.md)
+
+Automated inner-loop review replaces human code review. PRs with `ambient-code:self-reviewed` label merge via Mergify without human approval.
+
 ---
 
 ## Development Context
