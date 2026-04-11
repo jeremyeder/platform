@@ -20,7 +20,7 @@ The PR number is required. Example: `/pr-fixer 1234`
 ## What It Does
 
 1. **Pre-flight checks**
-   - Verify the PR exists and is open: `gh pr view <N> --repo <owner/repo> --json state -q .state`
+   - Verify the PR exists and is open: `gh pr view <N> --repo <owner/repo> --json state --jq .state`
    - If PR is closed/merged, abort with: "PR #N is already <state>. Nothing to fix."
    - If PR doesn't exist, abort with: "PR #N not found in <owner/repo>."
 
