@@ -142,10 +142,10 @@ spec:
           value: "production"
         - name: VERSION
           value: "latest"  # Override with actual version in production
-        # Go memory limit — tells GC to be aggressive before hitting container limit.
-        # Set to ~87.5% of memory limit (4Gi) per Go best practices.
+        # Go soft memory limit — keeps GC disciplined without risking OOMKill.
+        # No hard memory limit on this deployment; operator scales with cluster size.
         - name: GOMEMLIMIT
-          value: "3500MiB"
+          value: "1GiB"
         volumeMounts:
         # Model manifest (mounted ConfigMap — kubelet auto-syncs changes)
         - name: model-manifest
@@ -161,7 +161,9 @@ spec:
             memory: 512Mi
           limits:
             cpu: "2"
-            memory: 4Gi
+            # No memory limit — operator memory scales linearly with session
+            # count (~42KB per cached CR). Hard limits cause OOMKill at scale.
+            # GC discipline is enforced via GOMEMLIMIT soft target instead.
         livenessProbe:
           httpGet:
             path: /healthz
