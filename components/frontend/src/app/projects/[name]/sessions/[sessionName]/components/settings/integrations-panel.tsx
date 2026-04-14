@@ -52,9 +52,11 @@ export function IntegrationsPanel() {
     {
       key: "coderabbit",
       name: "CodeRabbit",
-      configured: coderabbitConfigured,
+      configured: true,
       configuredMessage:
-        "Authenticated. AI code review enabled in sessions.",
+        coderabbitConfigured
+          ? "Active. API key configured for private repos."
+          : "Active for public repositories. No configuration needed.",
     },
   ].sort((a, b) => a.name.localeCompare(b.name));
 

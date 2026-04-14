@@ -2,6 +2,10 @@
 # CodeRabbit pre-commit review hook
 # Runs CodeRabbit AI review on staged changes before commit.
 # Skips gracefully if: CLI not installed, no auth configured, nothing staged.
+#
+# Auth: works with EITHER:
+#   - CODERABBIT_API_KEY env var (for private repos / CI)
+#   - cr auth login session (for local dev on public repos — free)
 
 set -euo pipefail
 
@@ -19,9 +23,14 @@ if [ -z "$CR_BIN" ]; then
   exit 0
 fi
 
-# Check auth
-if [ -z "${CODERABBIT_API_KEY:-}" ]; then
-  echo "CODERABBIT_API_KEY not set — skipping review"
+# Check auth — API key takes priority, fall back to login session
+AUTH_ARGS=""
+if [ -n "${CODERABBIT_API_KEY:-}" ]; then
+  AUTH_ARGS="--api-key $CODERABBIT_API_KEY"
+elif ! "$CR_BIN" auth status 2>&1 | grep -qi "logged in"; then
+  echo "CodeRabbit: not authenticated — skipping review"
+  echo "  For public repos:  coderabbit auth login"
+  echo "  For private repos: add API key in Integrations"
   exit 0
 fi
 
@@ -34,7 +43,7 @@ echo "Running CodeRabbit review on staged changes..."
 
 OUTPUT=""
 EXIT_CODE=0
-OUTPUT=$(timeout 300 "$CR_BIN" review --type uncommitted --prompt-only 2>&1) || EXIT_CODE=$?
+OUTPUT=$(timeout 300 "$CR_BIN" review --agent --type uncommitted $AUTH_ARGS 2>&1) || EXIT_CODE=$?
 
 if [ "$EXIT_CODE" -eq 0 ]; then
   if [ -n "$OUTPUT" ]; then
@@ -50,6 +59,6 @@ if echo "$OUTPUT" | grep -qiE "rate.?limit|network|timeout|connection"; then
   exit 0
 fi
 
-# Actual review findings — show them but don't block the commit
+# Review findings — show but don't block
 echo "$OUTPUT"
 exit 0
