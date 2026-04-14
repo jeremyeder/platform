@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 
@@ -153,6 +155,16 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		logger.Error(err, "Unable to set up ready check")
 		os.Exit(1)
+	}
+
+	// Optional pprof server for memory profiling (enable via ENABLE_PPROF=true)
+	if os.Getenv("ENABLE_PPROF") == "true" {
+		go func() {
+			logger.Info("pprof server listening on :6060")
+			if err := http.ListenAndServe(":6060", nil); err != nil {
+				logger.Error(err, "pprof server failed")
+			}
+		}()
 	}
 
 	// Start namespace and project settings watchers (these remain as watch loops for now)
