@@ -227,3 +227,24 @@ func TestGitLabConnection(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"valid": true, "message": "GitLab connection successful"})
 }
+
+// TestCodeRabbitConnection handles POST /api/auth/coderabbit/test
+func TestCodeRabbitConnection(c *gin.Context) {
+	var req struct {
+		APIKey string `json:"apiKey" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Use the existing ValidateCodeRabbitAPIKey function from coderabbit_auth.go
+	valid := ValidateCodeRabbitAPIKey(req.APIKey)
+	if !valid {
+		c.JSON(http.StatusOK, gin.H{"valid": false, "error": "Invalid API key"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"valid": true, "message": "CodeRabbit connection successful"})
+}
