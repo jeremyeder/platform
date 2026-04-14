@@ -84,7 +84,7 @@ get_memory_usage() {
   if [[ -n "${PF_PID:-}" ]] && kill -0 "$PF_PID" 2>/dev/null; then
     local heap_bytes
     heap_bytes=$(curl -sf "http://localhost:6060/debug/pprof/heap?debug=1" 2>/dev/null \
-      | grep "# HeapInuse" | awk '{print $3}' || true)
+      | grep "# HeapInuse" | awk -F'= ' '{print $2}' || true)
     if [[ -n "$heap_bytes" && "$heap_bytes" -gt 0 ]] 2>/dev/null; then
       echo "$((heap_bytes / 1024 / 1024))Mi"
       return
