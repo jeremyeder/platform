@@ -59,6 +59,10 @@ NextJS patterns, Shadcn UI usage, React Query data fetching, component guideline
 
 Auth flows, RBAC enforcement, token handling, container security patterns.
 
+### [State-Sync Development Context](.claude/context/state-sync-development.md)
+
+Shell scripting conventions, security constraints, and testing approach for state-sync.
+
 ---
 
 ## Code Patterns
@@ -106,6 +110,10 @@ Operator development, watch patterns, reconciliation loop.
 ### [Runner README](components/runners/ambient-runner/README.md)
 
 Python runner development, Claude Code SDK integration.
+
+### [State-Sync Spec](components/runners/state-sync/spec/spec.md)
+
+Behavioral specification for the session state persistence sidecar.
 
 ### [Public API README](components/public-api/README.md)
 
