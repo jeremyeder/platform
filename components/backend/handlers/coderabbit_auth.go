@@ -21,36 +21,30 @@ type CodeRabbitCredentials struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// ValidateCodeRabbitAPIKey is a package-level var for test mockability
+// ValidateCodeRabbitAPIKey is a package-level var for test mockability.
+// Signature matches ValidateGitHubToken, ValidateGitLabToken, etc.
 var ValidateCodeRabbitAPIKey = validateCodeRabbitAPIKeyImpl
 
-// validateCodeRabbitAPIKeyImpl validates an API key against CodeRabbit's health endpoint
-func validateCodeRabbitAPIKeyImpl(apiKey string) bool {
-	req, err := http.NewRequest("GET", "https://api.coderabbit.ai/api/v1/health", nil)
+func validateCodeRabbitAPIKeyImpl(ctx context.Context, apiKey string) (bool, error) {
+	if apiKey == "" {
+		return false, fmt.Errorf("API key is empty")
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.coderabbit.ai/api/v1/health", nil)
 	if err != nil {
-		log.Printf("Failed to create CodeRabbit health check request: %v", err)
-		return false
+		return false, fmt.Errorf("failed to create request")
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("CodeRabbit health check failed: %v", err)
-		return false
+		return false, fmt.Errorf("request failed: %w", networkError(err))
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("CodeRabbit health check returned status %d", resp.StatusCode)
-		return false
-	}
-
-	return true
+	return resp.StatusCode == http.StatusOK, nil
 }
 
 // ConnectCodeRabbit handles POST /api/auth/coderabbit/connect
@@ -83,14 +77,14 @@ func ConnectCodeRabbit(c *gin.Context) {
 		return
 	}
 
-	// Validate API key
-	if req.APIKey == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "CodeRabbit API key is required"})
+	// Validate against CodeRabbit health API
+	valid, err := ValidateCodeRabbitAPIKey(c.Request.Context(), req.APIKey)
+	if err != nil {
+		log.Printf("Failed to validate CodeRabbit API key for user %s: %v", userID, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to validate API key with CodeRabbit"})
 		return
 	}
-
-	// Validate against CodeRabbit health API
-	if !ValidateCodeRabbitAPIKey(req.APIKey) {
+	if !valid {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid CodeRabbit API key"})
 		return
 	}
@@ -108,7 +102,7 @@ func ConnectCodeRabbit(c *gin.Context) {
 		return
 	}
 
-	log.Printf("✓ Stored CodeRabbit credentials for user %s (key length: %d)", userID, len(req.APIKey))
+	log.Printf("Stored CodeRabbit credentials for user %s", userID)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "CodeRabbit connected successfully",
 	})
@@ -174,7 +168,7 @@ func DisconnectCodeRabbit(c *gin.Context) {
 		return
 	}
 
-	log.Printf("✓ Deleted CodeRabbit credentials for user %s", userID)
+	log.Printf("Deleted CodeRabbit credentials for user %s", userID)
 	c.JSON(http.StatusOK, gin.H{"message": "CodeRabbit disconnected successfully"})
 }
 

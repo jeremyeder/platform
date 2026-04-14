@@ -23,7 +23,7 @@ var _ = Describe("CodeRabbit Auth Handler", Label(test_constants.LabelUnit, test
 		httpUtils                      *test_utils.HTTPTestUtils
 		k8sUtils                       *test_utils.K8sTestUtils
 		originalNamespace              string
-		originalValidateCodeRabbitAPIKey func(string) bool
+		originalValidateCodeRabbitAPIKey func(context.Context, string) (bool, error)
 		testToken                      string
 	)
 
@@ -32,7 +32,7 @@ var _ = Describe("CodeRabbit Auth Handler", Label(test_constants.LabelUnit, test
 
 		originalNamespace = Namespace
 		originalValidateCodeRabbitAPIKey = ValidateCodeRabbitAPIKey
-		ValidateCodeRabbitAPIKey = func(_ string) bool { return true }
+		ValidateCodeRabbitAPIKey = func(_ context.Context, _ string) (bool, error) { return true, nil }
 
 		// Use centralized handler dependencies setup
 		k8sUtils = test_utils.NewK8sTestUtils(false, *config.TestNamespace)
@@ -140,7 +140,7 @@ var _ = Describe("CodeRabbit Auth Handler", Label(test_constants.LabelUnit, test
 
 			It("Should reject invalid API key", func() {
 				// Mock validation to return false
-				ValidateCodeRabbitAPIKey = func(_ string) bool { return false }
+				ValidateCodeRabbitAPIKey = func(_ context.Context, _ string) (bool, error) { return false, nil }
 
 				requestBody := map[string]interface{}{
 					"apiKey": "invalid_key_123",
@@ -160,7 +160,7 @@ var _ = Describe("CodeRabbit Auth Handler", Label(test_constants.LabelUnit, test
 
 			It("Should store credentials successfully with valid API key", func() {
 				// Mock validation to return true
-				ValidateCodeRabbitAPIKey = func(_ string) bool { return true }
+				ValidateCodeRabbitAPIKey = func(_ context.Context, _ string) (bool, error) { return true, nil }
 
 				requestBody := map[string]interface{}{
 					"apiKey": "cr_valid_key_1234567890",

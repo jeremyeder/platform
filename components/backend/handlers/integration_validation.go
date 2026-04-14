@@ -239,8 +239,12 @@ func TestCodeRabbitConnection(c *gin.Context) {
 		return
 	}
 
-	// Use the existing ValidateCodeRabbitAPIKey function from coderabbit_auth.go
-	valid := ValidateCodeRabbitAPIKey(req.APIKey)
+	valid, err := ValidateCodeRabbitAPIKey(c.Request.Context(), req.APIKey)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error()})
+		return
+	}
+
 	if !valid {
 		c.JSON(http.StatusOK, gin.H{"valid": false, "error": "Invalid API key"})
 		return
