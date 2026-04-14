@@ -336,7 +336,9 @@ for (( batch=1; batch<=TOTAL_BATCHES; batch++ )); do
         "app.kubernetes.io/part-of=oom-reproducer" 2>/dev/null | \
       kubectl apply -f - >/dev/null 2>&1
 
-    # Create AgenticSession CRs in this namespace
+    # Create AgenticSession CRs in this namespace and mark them Completed
+    # so the cache transform can strip their spec/status (simulating
+    # production where most sessions are terminal)
     for (( s=0; s<SESSIONS_PER_NS; s++ )); do
       SESSION_NAME=$(printf "repro-session-%03d" "$s")
       kubectl apply -f - >/dev/null 2>&1 <<YAML
@@ -349,6 +351,10 @@ spec:
   initialPrompt: "oom reproducer session"
   timeout: 60
 YAML
+      # Set status to Completed via status subresource
+      kubectl patch agenticsession "$SESSION_NAME" -n "$NS_NAME" \
+        --type merge --subresource status \
+        -p '{"status":{"phase":"Completed"}}' >/dev/null 2>&1 || true
       SESSIONS_CREATED=$((SESSIONS_CREATED + 1))
     done
 
