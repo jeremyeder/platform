@@ -10,10 +10,13 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	toolscache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,6 +46,37 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+}
+
+// stripTerminalSessions is a cache transform that strips heavy fields from
+// AgenticSession objects in terminal phases (Completed, Failed, Stopped).
+// Terminal sessions dominate the cache at scale (e.g., 80%+ of 4,319 sessions
+// on vteam-uat). Stripping spec and status details reduces their memory
+// footprint from ~3.5KB to ~500 bytes while preserving metadata for restart
+// detection (the desired-phase annotation lives in metadata.annotations).
+var stripTerminalSessions toolscache.TransformFunc = func(obj interface{}) (interface{}, error) {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return obj, nil
+	}
+
+	status, _, _ := unstructured.NestedMap(u.Object, "status")
+	if status == nil {
+		return obj, nil
+	}
+
+	phase, _ := status["phase"].(string)
+	switch phase {
+	case "Completed", "Failed", "Stopped":
+		// Keep metadata intact (name, namespace, annotations, labels, ownerRefs,
+		// resourceVersion, generation) — needed for restart detection and predicates.
+		// Drop spec and heavy status fields — not needed until session restarts,
+		// at which point the phase changes to Pending and the full object is re-fetched.
+		u.Object["spec"] = map[string]interface{}{}
+		u.Object["status"] = map[string]interface{}{"phase": phase}
+	}
+
+	return obj, nil
 }
 
 func main() {
@@ -126,6 +160,14 @@ func main() {
 	restConfig.QPS = 100
 	restConfig.Burst = 200
 
+	// AgenticSession unstructured object for cache configuration
+	sessionCacheObj := &unstructured.Unstructured{}
+	sessionCacheObj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "vteam.ambient-code",
+		Version: "v1alpha1",
+		Kind:    "AgenticSession",
+	})
+
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
@@ -133,12 +175,19 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "ambient-code-operator.ambient-code.io",
 		Cache: cache.Options{
-			// Only cache runner pods (app=ambient-runner), not every pod in the cluster.
-			// This dramatically reduces memory usage at scale — on vteam-uat, 397 of 477
-			// pods were non-runner system pods consuming cache memory for no reason.
 			ByObject: map[client.Object]cache.ByObject{
+				// Only cache runner pods (app=ambient-runner), not every pod in the cluster.
+				// On vteam-uat, 397 of 477 pods were non-runner system pods.
 				&corev1.Pod{}: {
 					Label: labels.SelectorFromSet(labels.Set{"app": "ambient-runner"}),
+				},
+				// Strip heavy fields from terminal sessions in the cache.
+				// Keeps metadata (for restart detection via desired-phase annotation)
+				// and phase, but drops spec and status details. On vteam-uat, most of
+				// 4,319 sessions are terminal — this reduces their per-object memory
+				// from ~3.5KB to ~500 bytes (metadata + phase only).
+				sessionCacheObj: {
+					Transform: stripTerminalSessions,
 				},
 			},
 		},
