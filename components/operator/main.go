@@ -9,10 +9,14 @@ import (
 	"os"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -128,6 +132,16 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "ambient-code-operator.ambient-code.io",
+		Cache: cache.Options{
+			// Only cache runner pods (app=ambient-runner), not every pod in the cluster.
+			// This dramatically reduces memory usage at scale — on vteam-uat, 397 of 477
+			// pods were non-runner system pods consuming cache memory for no reason.
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Pod{}: {
+					Label: labels.SelectorFromSet(labels.Set{"app": "ambient-runner"}),
+				},
+			},
+		},
 	})
 	if err != nil {
 		logger.Error(err, "Unable to create manager")

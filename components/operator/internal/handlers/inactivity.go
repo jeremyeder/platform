@@ -53,6 +53,10 @@ func init() {
 
 // --- Project-level timeout cache ---
 
+// maxTimeoutCacheEntries caps the namespace timeout cache size to prevent
+// unbounded growth in clusters with many namespaces.
+const maxTimeoutCacheEntries = 500
+
 // projectTimeoutCache caches inactivityTimeoutSeconds from ProjectSettings per namespace.
 type projectTimeoutCache struct {
 	mu      sync.Mutex
@@ -93,8 +97,28 @@ func getProjectInactivityTimeout(namespace string) int64 {
 		}
 	}
 
-	// Update cache under lock
+	// Update cache under lock, evicting stale entries if over capacity
 	psTimeoutCache.mu.Lock()
+	if len(psTimeoutCache.entries) >= maxTimeoutCacheEntries {
+		// Evict expired entries first
+		now := time.Now()
+		for k, v := range psTimeoutCache.entries {
+			if now.Sub(v.fetchedAt) >= inactivityTimeoutCacheTTL {
+				delete(psTimeoutCache.entries, k)
+			}
+		}
+		// If still over capacity, clear the oldest half
+		if len(psTimeoutCache.entries) >= maxTimeoutCacheEntries {
+			count := 0
+			for k := range psTimeoutCache.entries {
+				delete(psTimeoutCache.entries, k)
+				count++
+				if count >= maxTimeoutCacheEntries/2 {
+					break
+				}
+			}
+		}
+	}
 	psTimeoutCache.entries[namespace] = projectTimeoutEntry{timeout: result, fetchedAt: time.Now()}
 	psTimeoutCache.mu.Unlock()
 

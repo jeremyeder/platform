@@ -28,6 +28,20 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+// Shared HTTP client for runner API calls. Reusing a single client enables
+// connection pooling and avoids TIME_WAIT socket accumulation.
+var runnerHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     30 * time.Second,
+	},
+}
+
+// maxErrorBodyBytes limits how much of an error response body we read into
+// memory. Prevents unbounded allocation if a runner returns a large error page.
+const maxErrorBodyBytes = 64 * 1024 // 64 KB
+
 // handleAgenticSessionEvent is the legacy reconciliation function containing all session
 // lifecycle logic (~2,300 lines). It's called by ReconcilePendingSession() wrapper.
 //
@@ -1615,8 +1629,7 @@ func reconcileSpecReposWithPatch(sessionNamespace, sessionName string, spec map[
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
+		resp, err := runnerHTTPClient.Do(req)
 		if err != nil {
 			log.Printf("[Reconcile] Failed to add repo via runner: %v", err)
 			continue
@@ -1647,8 +1660,7 @@ func reconcileSpecReposWithPatch(sessionNamespace, sessionName string, spec map[
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
+		resp, err := runnerHTTPClient.Do(req)
 		if err != nil {
 			log.Printf("[Reconcile] Failed to change branch via runner: %v", err)
 			continue
@@ -1676,8 +1688,7 @@ func reconcileSpecReposWithPatch(sessionNamespace, sessionName string, spec map[
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
+		resp, err := runnerHTTPClient.Do(req)
 		if err != nil {
 			log.Printf("[Reconcile] Failed to remove repo via runner: %v", err)
 			continue
@@ -1768,8 +1779,7 @@ func reconcileActiveWorkflowWithPatch(sessionNamespace, sessionName string, spec
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := runnerHTTPClient.Do(req)
 	if err != nil {
 		log.Printf("[Reconcile] Failed to send workflow change to runner: %v", err)
 		statusPatch.AddCondition(conditionUpdate{
@@ -1783,7 +1793,7 @@ func reconcileActiveWorkflowWithPatch(sessionNamespace, sessionName string, spec
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
 		log.Printf("[Reconcile] Runner returned non-200 for workflow change: %d - %s", resp.StatusCode, string(body))
 		statusPatch.AddCondition(conditionUpdate{
 			Type:    conditionWorkflowReconciled,
