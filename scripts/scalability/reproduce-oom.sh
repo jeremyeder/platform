@@ -10,8 +10,8 @@ set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 MEM_LIMIT="128Mi"
-NAMESPACES=500
-SESSIONS_PER_NS=5
+NAMESPACES=1000
+SESSIONS_PER_NS=10
 BATCH_SIZE=50
 PPROF=false
 CLEANUP=false
@@ -22,6 +22,8 @@ LABEL_REPRODUCER="app.kubernetes.io/part-of=oom-reproducer"
 PPROF_DIR="pprof-dumps"
 PPROF_RUN_DIR=""
 PF_PID=""
+LOG_DIR="scalability-runs"
+LOG_FILE=""
 
 # ── Usage ─────────────────────────────────────────────────────────────────────
 usage() {
@@ -57,6 +59,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ── Log file setup ───────────────────────────────────────────────────────────
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/oom-repro-$(date +%Y%m%dT%H%M%S).log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Log file: $LOG_FILE"
+echo ""
+
 # ── Helper functions ──────────────────────────────────────────────────────────
 
 get_operator_pod() {
@@ -71,7 +80,17 @@ get_restart_count() {
 }
 
 get_memory_usage() {
-  # kubectl top requires metrics-server; fall back gracefully
+  # Use pprof if port-forward is running (most reliable on kind without metrics-server)
+  if [[ -n "${PF_PID:-}" ]] && kill -0 "$PF_PID" 2>/dev/null; then
+    local heap_bytes
+    heap_bytes=$(curl -sf "http://localhost:6060/debug/pprof/heap?debug=1" 2>/dev/null \
+      | grep "# HeapInuse" | awk '{print $3}' || true)
+    if [[ -n "$heap_bytes" && "$heap_bytes" -gt 0 ]] 2>/dev/null; then
+      echo "$((heap_bytes / 1024 / 1024))Mi"
+      return
+    fi
+  fi
+  # Fall back to kubectl top (requires metrics-server)
   kubectl top pod -n "$OPERATOR_NS" -l app=agentic-operator \
     --no-headers 2>/dev/null | awk '{print $3}' || echo "N/A"
 }
@@ -83,32 +102,46 @@ is_oomkilled() {
   [[ "$reason" == "OOMKilled" ]]
 }
 
-capture_heap_profile() {
-  local batch_num="$1"
-
+start_port_forward() {
+  # Start persistent port-forward to operator pprof endpoint
   local pod
   pod=$(get_operator_pod)
   if [[ -z "$pod" ]]; then
-    echo "  [pprof] No running operator pod found, skipping heap capture."
-    return
+    echo "  [pprof] No running operator pod found, cannot start port-forward."
+    return 1
   fi
-
-  # Start port-forward in background
   kubectl port-forward -n "$OPERATOR_NS" "pod/$pod" 6060:6060 >/dev/null 2>&1 &
   PF_PID=$!
   sleep 2
+  if ! kill -0 "$PF_PID" 2>/dev/null; then
+    echo "  [pprof] Port-forward failed to start."
+    PF_PID=""
+    return 1
+  fi
+  echo "  [pprof] Port-forward to $pod:6060 started (pid $PF_PID)."
+  return 0
+}
+
+capture_heap_profile() {
+  local batch_num="$1"
+
+  # Ensure port-forward is alive (operator may have restarted)
+  if [[ -z "${PF_PID:-}" ]] || ! kill -0 "$PF_PID" 2>/dev/null; then
+    PF_PID=""
+    start_port_forward || return
+  fi
 
   local outfile
   outfile="$PPROF_RUN_DIR/heap-batch-$(printf '%04d' "$batch_num").pb.gz"
   if curl -sS "http://localhost:6060/debug/pprof/heap" -o "$outfile" 2>/dev/null; then
     echo "  [pprof] Saved heap profile: $outfile"
   else
-    echo "  [pprof] Failed to capture heap profile."
+    echo "  [pprof] Failed to capture heap profile (operator may have restarted)."
+    # Kill stale port-forward so next call reconnects
+    kill "$PF_PID" 2>/dev/null || true
+    wait "$PF_PID" 2>/dev/null || true
+    PF_PID=""
   fi
-
-  kill "$PF_PID" 2>/dev/null || true
-  wait "$PF_PID" 2>/dev/null || true
-  PF_PID=""
 }
 
 # ── Cleanup trap ──────────────────────────────────────────────────────────────
@@ -261,6 +294,11 @@ kubectl rollout status deployment/"$OPERATOR_DEPLOY" -n "$OPERATOR_NS" --timeout
 
 echo "  Stabilizing (5s)..."
 sleep 5
+
+# Start persistent port-forward for memory monitoring + heap capture
+if [[ "$PPROF" == "true" ]]; then
+  start_port_forward || true
+fi
 echo ""
 
 # ── Record baseline ──────────────────────────────────────────────────────────

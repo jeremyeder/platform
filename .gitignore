@@ -118,6 +118,10 @@ e2e/langfuse/.env.langfuse-keys
 logs/
 reports/
 
+# Scalability test output
+pprof-dumps/
+scalability-runs/
+
 # Security scan artifacts
 .security-scan/
 .security-scan.zip
