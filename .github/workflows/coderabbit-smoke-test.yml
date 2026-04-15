@@ -86,7 +86,6 @@ jobs:
           OUTPUT=$(coderabbit review \
             --agent \
             --files .coderabbit.yaml \
-            --api-key "$CODERABBIT_API_KEY" \
             2>&1) || EXIT_CODE=$?
 
           echo "$OUTPUT"

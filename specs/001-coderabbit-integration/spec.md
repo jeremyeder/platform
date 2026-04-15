@@ -118,5 +118,5 @@ A pre-commit hook runs CodeRabbit review on staged changes before each commit. T
 
 - CodeRabbit's health endpoint is the correct validation mechanism and returns 200 for valid keys
 - CodeRabbit API keys do not expire and do not require proactive refresh
-- The CodeRabbit CLI binary is named `coderabbit` (with `cr` as a fallback) and supports `review --type uncommitted --prompt-only`
+- The CodeRabbit CLI binary is named `coderabbit` and supports `review --agent --base <branch>`
 - The existing Jira integration pattern is the canonical pattern to follow for new integrations
