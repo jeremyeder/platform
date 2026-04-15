@@ -29,10 +29,3 @@ export async function connectCodeRabbit(data: CodeRabbitConnectRequest): Promise
 export async function disconnectCodeRabbit(): Promise<void> {
   await apiClient.delete<void>('/auth/coderabbit/disconnect')
 }
-
-/**
- * Test CodeRabbit API key validity
- */
-export async function testCodeRabbitConnection(data: CodeRabbitConnectRequest): Promise<{ valid: boolean; error?: string }> {
-  return apiClient.post<{ valid: boolean; error?: string }, CodeRabbitConnectRequest>('/auth/coderabbit/test', data)
-}

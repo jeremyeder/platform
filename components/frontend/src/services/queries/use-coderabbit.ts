@@ -1,12 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as codeRabbitAuthApi from '../api/coderabbit-auth'
-
-export function useCodeRabbitStatus() {
-  return useQuery({
-    queryKey: ['coderabbit', 'status'],
-    queryFn: () => codeRabbitAuthApi.getCodeRabbitStatus(),
-  })
-}
 
 export function useConnectCodeRabbit() {
   const queryClient = useQueryClient()

@@ -129,7 +129,7 @@ assert_status "$STATUS" "200" "Disconnect (idempotent) returns 200"
 
 # 1f. Runtime creds for nonexistent session → 404
 BODY=$(curl -s "${AUTH[@]}" "$BACKEND/api/projects/default/agentic-sessions/nonexistent/credentials/coderabbit")
-assert_json "$BODY" "error" "Session not found" "Runtime creds for missing session returns 404"
+assert_json "$BODY" "error" "CodeRabbit credentials not configured" "Runtime creds for missing session returns 404"
 
 # 1g. Test with real API key (optional)
 if [ -n "${CODERABBIT_API_KEY:-}" ]; then
@@ -179,7 +179,7 @@ print('NONE')
 
 if [ "$FRONTEND_PORT" != "NONE" ]; then
   # The frontend is behind the kind NodePort — check container port mapping
-  FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9323/integrations" 2>/dev/null || echo "000")
+  FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${FRONTEND_PORT}/integrations" 2>/dev/null || echo "000")
   if [ "$FRONTEND_STATUS" = "200" ]; then pass "Integrations page loads (HTTP 200)"
   else skip "Integrations page returned $FRONTEND_STATUS (may need auth)"; fi
 else

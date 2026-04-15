@@ -562,15 +562,15 @@ async def populate_mcp_server_credentials(context: RunnerContext) -> None:
             logger.warning(f"Failed to fetch MCP credentials for {server_name}: {e}")
 
 
-_GH_WRAPPER_DIR = "/tmp/bin"
-_GH_WRAPPER_PATH = "/tmp/bin/gh"
+_GH_WRAPPER_DIR = ""  # Set at first install via tempfile.mkdtemp
+_GH_WRAPPER_PATH = ""  # Set at first install
 
 # Wrapper script for the gh CLI.  The `gh` CLI reads GITHUB_TOKEN from the
 # process environment, but the CLI subprocess's env is fixed at spawn time.
 # This wrapper reads the latest token from the token file (updated on every
 # credential refresh) and exports GH_TOKEN before calling the real `gh`,
 # ensuring mid-run refreshes are picked up.
-_GH_WRAPPER_SCRIPT = """\
+_GH_WRAPPER_SCRIPT_TEMPLATE = """\
 #!/bin/sh
 # Ambient gh CLI wrapper — reads fresh GitHub token from file.
 token=""
@@ -595,7 +595,7 @@ if [ -z "$real_gh" ]; then
     exit 1
 fi
 exec "$real_gh" "$@"
-""".format(wrapper_dir=_GH_WRAPPER_DIR)
+"""
 
 _gh_wrapper_installed = False  # reset on every new process / deployment
 
@@ -702,26 +702,28 @@ def install_gh_wrapper() -> None:
     credential refresh.  This wrapper reads from the token file (updated on
     every refresh) and exports ``GH_TOKEN`` before exec-ing the real ``gh``.
     """
-    global _gh_wrapper_installed
+    global _gh_wrapper_installed, _GH_WRAPPER_DIR, _GH_WRAPPER_PATH
     if _gh_wrapper_installed:
         return
 
     import stat
+    import tempfile
 
     try:
-        wrapper_dir = Path(_GH_WRAPPER_DIR)
-        wrapper_dir.mkdir(parents=True, exist_ok=True)
+        wrapper_dir = tempfile.mkdtemp(prefix="ambient-gh-")
+        os.chmod(wrapper_dir, 0o700)
+        _GH_WRAPPER_DIR = wrapper_dir
+        _GH_WRAPPER_PATH = f"{wrapper_dir}/gh"
 
         wrapper_path = Path(_GH_WRAPPER_PATH)
-        wrapper_path.write_text(_GH_WRAPPER_SCRIPT)
-        wrapper_path.chmod(
-            stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
-        )  # 755
+        wrapper_path.write_text(
+            _GH_WRAPPER_SCRIPT_TEMPLATE.format(wrapper_dir=_GH_WRAPPER_DIR)
+        )
+        wrapper_path.chmod(stat.S_IRWXU)  # 700
 
         # Prepend wrapper dir to PATH so it is found before the real gh.
         current_path = os.environ.get("PATH", "")
-        if _GH_WRAPPER_DIR not in current_path.split(":"):
-            os.environ["PATH"] = f"{_GH_WRAPPER_DIR}:{current_path}"
+        os.environ["PATH"] = f"{_GH_WRAPPER_DIR}:{current_path}"
 
         _gh_wrapper_installed = True
         logger.info("Installed gh CLI wrapper at %s", _GH_WRAPPER_PATH)
