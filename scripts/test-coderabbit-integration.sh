@@ -188,31 +188,33 @@ fi
 
 echo ""
 
-# ─── 4. Pre-commit Hook ─────────────────────────────────────────────────
+# ─── 4. Review Gate ────────────────────────────────────────────────────
 
-echo "4. Pre-commit Hook"
+echo "4. Review Gate"
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-HOOK="$REPO_ROOT/scripts/pre-commit/coderabbit-review.sh"
-if [ -x "$HOOK" ]; then
-  # Test skip when no auth and no staged changes — hook should exit 0
-  unset CODERABBIT_API_KEY 2>/dev/null || true
-  HOOK_EXIT=0
-  OUTPUT=$("$HOOK" 2>&1) || HOOK_EXIT=$?
-  if [ "$HOOK_EXIT" -eq 0 ]; then
-    # Exit 0 is correct — it either skipped (printed message) or found nothing staged (silent)
-    if [ -z "$OUTPUT" ]; then
-      pass "Hook exits cleanly with nothing staged"
-    elif echo "$OUTPUT" | grep -qiE "not found|not set|not authenticated|skipping"; then
-      pass "Hook skips gracefully without auth"
+GATE="$REPO_ROOT/scripts/hooks/coderabbit-review-gate.sh"
+if [ -x "$GATE" ]; then
+  # Run in standalone mode (no CLAUDE_TOOL_INPUT) — exercises same
+  # coderabbit review --agent --base main path as the hook.
+  GATE_EXIT=0
+  OUTPUT=$(bash "$GATE" 2>&1) || GATE_EXIT=$?
+  if [ "$GATE_EXIT" -eq 0 ]; then
+    pass "Review gate passed"
+  elif [ "$GATE_EXIT" -eq 2 ]; then
+    # Exit 2 = blocked (findings, CLI missing, or rate limit)
+    if echo "$OUTPUT" | grep -qiE "CLI not found"; then
+      skip "Review gate: CodeRabbit CLI not installed"
+    elif echo "$OUTPUT" | grep -qiE "rate.limited"; then
+      skip "Review gate: CodeRabbit rate-limited"
     else
-      pass "Hook ran successfully"
+      pass "Review gate blocked with findings (expected)"
     fi
   else
-    fail "Hook exited $HOOK_EXIT: $OUTPUT"
+    fail "Review gate exited $GATE_EXIT: $OUTPUT"
   fi
 else
-  fail "Hook not found or not executable at $HOOK"
+  fail "Review gate not found or not executable at $GATE"
 fi
 
 echo ""
