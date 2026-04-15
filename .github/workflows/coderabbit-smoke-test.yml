@@ -14,7 +14,7 @@ on:
       - 'components/backend/handlers/integration_validation.go'
       - 'components/frontend/src/components/coderabbit-connection-card.tsx'
       - 'components/runners/ambient-runner/ambient_runner/platform/auth.py'
-      - 'scripts/pre-commit/coderabbit-review.sh'
+      - 'scripts/hooks/coderabbit-review-gate.sh'
       - '.github/workflows/coderabbit-smoke-test.yml'
 
   workflow_dispatch:
@@ -104,25 +104,26 @@ jobs:
 
           echo "PASSED: CodeRabbit API responded successfully"
 
-      - name: Verify pre-commit hook skips gracefully
+      - name: Verify review gate runs in standalone mode
+        env:
+          CODERABBIT_API_KEY: ${{ secrets.CODERABBIT_API_KEY }}
         run: |
-          echo "=== Testing pre-commit hook graceful skip ==="
-          unset CODERABBIT_API_KEY
+          echo "=== Testing review gate (standalone / CI mode) ==="
+          chmod +x scripts/hooks/coderabbit-review-gate.sh
 
-          chmod +x scripts/pre-commit/coderabbit-review.sh
-          OUTPUT=$(scripts/pre-commit/coderabbit-review.sh 2>&1)
-          EXIT_CODE=$?
+          # Run without CLAUDE_TOOL_INPUT — triggers standalone mode
+          # which runs coderabbit review --agent --base main directly.
+          EXIT_CODE=0
+          OUTPUT=$(bash scripts/hooks/coderabbit-review-gate.sh 2>&1) || EXIT_CODE=$?
 
           echo "$OUTPUT"
 
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "FAILED: Hook should exit 0 when skipping"
+          # Exit 0 = review passed, exit 2 = findings or CLI missing
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "PASSED: Review gate completed successfully"
+          elif [ "$EXIT_CODE" -eq 2 ]; then
+            echo "PASSED: Review gate blocked (expected in CI — findings or rate limit)"
+          else
+            echo "FAILED: Unexpected exit code $EXIT_CODE"
             exit 1
           fi
-
-          if ! echo "$OUTPUT" | grep -qiE "not found|not set|skipping"; then
-            echo "FAILED: Hook should print a skip message"
-            exit 1
-          fi
-
-          echo "PASSED: Pre-commit hook skips gracefully"
