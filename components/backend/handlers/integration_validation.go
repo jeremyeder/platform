@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -241,7 +242,8 @@ func TestCodeRabbitConnection(c *gin.Context) {
 
 	valid, err := ValidateCodeRabbitAPIKey(c.Request.Context(), req.APIKey)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error()})
+		log.Printf("CodeRabbit API key validation failed: %v", err)
+		c.JSON(http.StatusOK, gin.H{"valid": false, "error": "Failed to validate API key with CodeRabbit"})
 		return
 	}
 

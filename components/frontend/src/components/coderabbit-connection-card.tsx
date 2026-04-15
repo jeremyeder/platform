@@ -103,9 +103,10 @@ export function CodeRabbitConnectionCard({ status, onRefresh }: Props) {
 
         {/* Private repo access — collapsed by default */}
         <div className="mt-auto">
-          <button
+          <Button
             type="button"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            variant="ghost"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground h-auto p-0"
             onClick={() => setShowAdvanced(!showAdvanced)}
           >
             {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -113,7 +114,7 @@ export function CodeRabbitConnectionCard({ status, onRefresh }: Props) {
             {status?.connected && (
               <span className="ml-1.5 w-2 h-2 rounded-full bg-green-500 inline-block" />
             )}
-          </button>
+          </Button>
 
           {showAdvanced && (
             <div className="mt-3 pt-3 border-t border-border/40 space-y-3">

@@ -44,7 +44,14 @@ func validateCodeRabbitAPIKeyImpl(ctx context.Context, apiKey string) (bool, err
 	}
 	defer resp.Body.Close()
 
-	return resp.StatusCode == http.StatusOK, nil
+	switch {
+	case resp.StatusCode == http.StatusOK:
+		return true, nil
+	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("upstream error: status %d", resp.StatusCode)
+	}
 }
 
 // ConnectCodeRabbit handles POST /api/auth/coderabbit/connect

@@ -22,6 +22,9 @@ on:
   schedule:
     - cron: '0 6 * * 1' # Weekly Monday 6am UTC
 
+permissions:
+  contents: read
+
 concurrency:
   group: coderabbit-smoke-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -34,10 +37,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: '20'
 
@@ -79,17 +82,24 @@ jobs:
           fi
 
           # Review the config file itself using agent mode for structured output
+          EXIT_CODE=0
           OUTPUT=$(coderabbit review \
             --agent \
             --files .coderabbit.yaml \
             --api-key "$CODERABBIT_API_KEY" \
-            2>&1) || true
+            2>&1) || EXIT_CODE=$?
 
           echo "$OUTPUT"
 
-          # Verify we got a response (not an auth error)
+          # Auth errors are fatal
           if echo "$OUTPUT" | grep -qiE "unauthorized|forbidden|invalid.*key"; then
             echo "FAILED: CodeRabbit API key appears invalid"
+            exit 1
+          fi
+
+          # Non-zero exit from CLI is a real failure
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "FAILED: coderabbit review exited $EXIT_CODE"
             exit 1
           fi
 

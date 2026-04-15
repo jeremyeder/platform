@@ -361,6 +361,10 @@ func GetCodeRabbitCredentialsForSession(c *gin.Context) {
 
 	creds, err := GetCodeRabbitCredentials(c.Request.Context(), effectiveUserID)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "CodeRabbit credentials not configured"})
+			return
+		}
 		log.Printf("Failed to get CodeRabbit credentials for user %s: %v", effectiveUserID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get CodeRabbit credentials"})
 		return

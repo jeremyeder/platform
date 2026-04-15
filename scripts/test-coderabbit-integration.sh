@@ -197,8 +197,8 @@ HOOK="$REPO_ROOT/scripts/pre-commit/coderabbit-review.sh"
 if [ -x "$HOOK" ]; then
   # Test skip when no auth and no staged changes — hook should exit 0
   unset CODERABBIT_API_KEY 2>/dev/null || true
-  OUTPUT=$("$HOOK" 2>&1) || true
-  HOOK_EXIT=$?
+  HOOK_EXIT=0
+  OUTPUT=$("$HOOK" 2>&1) || HOOK_EXIT=$?
   if [ "$HOOK_EXIT" -eq 0 ]; then
     # Exit 0 is correct — it either skipped (printed message) or found nothing staged (silent)
     if [ -z "$OUTPUT" ]; then
