@@ -317,7 +317,13 @@ async def populate_runtime_credentials(context: RunnerContext) -> None:
     logger.info("Fetching fresh credentials from backend API...")
 
     # Fetch all credentials concurrently
-    google_creds, jira_creds, gitlab_creds, github_creds, coderabbit_creds = await asyncio.gather(
+    (
+        google_creds,
+        jira_creds,
+        gitlab_creds,
+        github_creds,
+        coderabbit_creds,
+    ) = await asyncio.gather(
         fetch_google_credentials(context),
         fetch_jira_credentials(context),
         fetch_gitlab_credentials(context),

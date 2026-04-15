@@ -20,11 +20,11 @@ import (
 
 var _ = Describe("CodeRabbit Auth Handler", Label(test_constants.LabelUnit, test_constants.LabelHandlers, test_constants.LabelCodeRabbitAuth), func() {
 	var (
-		httpUtils                      *test_utils.HTTPTestUtils
-		k8sUtils                       *test_utils.K8sTestUtils
-		originalNamespace              string
+		httpUtils                        *test_utils.HTTPTestUtils
+		k8sUtils                         *test_utils.K8sTestUtils
+		originalNamespace                string
 		originalValidateCodeRabbitAPIKey func(context.Context, string) (bool, error)
-		testToken                      string
+		testToken                        string
 	)
 
 	BeforeEach(func() {

@@ -142,4 +142,3 @@ function IntegrationCard({
     </div>
   );
 }
-
