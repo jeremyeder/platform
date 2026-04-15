@@ -44,10 +44,10 @@ func validateCodeRabbitAPIKeyImpl(ctx context.Context, apiKey string) (bool, err
 	}
 	defer resp.Body.Close()
 
-	switch {
-	case resp.StatusCode == http.StatusOK:
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:
 		return false, fmt.Errorf("upstream error: status %d", resp.StatusCode)
