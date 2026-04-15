@@ -54,6 +54,15 @@
             "prompt": "If the file being written matches 'components/frontend/src/app/**/page.tsx' or 'components/backend/handlers/**/*.go' and it is a NEW file (not editing an existing one), remind: 'New feature code detected. Consider gating behind a feature flag. Use /unleash-flag to set one up.'"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && bash scripts/hooks/coderabbit-review-gate.sh"
+          }
+        ]
       }
     ],
     "Stop": [
