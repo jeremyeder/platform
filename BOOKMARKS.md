@@ -36,6 +36,7 @@ Progressive disclosure for task-specific documentation and references.
 | [ADR-0005](docs/internal/adr/0005-nextjs-shadcn-react-query.md) | NextJS + Shadcn + React Query frontend stack |
 | [ADR-0006](docs/internal/adr/0006-ambient-runner-sdk-architecture.md) | Runner SDK design and architecture |
 | [ADR-0007](docs/internal/adr/0007-unleash-feature-flags.md) | Unleash with workspace-scoped overrides |
+| [ADR-0008](docs/internal/adr/0008-automate-code-reviews.md) | Automated code reviews with CodeRabbit inner-loop gate |
 
 ## Component Development Guides
 
@@ -66,6 +67,7 @@ Convention documentation for each component. Loaded by review agents on demand.
 | [API Server Guide](components/ambient-api-server/CLAUDE.md) | rh-trex-ai REST API, plugin system, code generation |
 | [SDK Guide](components/ambient-sdk/CLAUDE.md) | Go + Python client libraries for the public API |
 | [CLI README](components/ambient-cli/README.md) | acpctl CLI for managing agentic sessions |
+| [CodeRabbit Integration](docs/src/content/docs/features/coderabbit.md) | Setup, review gate, session credentials, `.coderabbit.yaml` config |
 
 ## Development Environment
 

@@ -50,21 +50,15 @@ coderabbit auth login
 coderabbit review --agent
 ```
 
-### Pre-commit hook
+### Review Gate (PR creation)
 
-The platform includes a pre-commit hook that runs CodeRabbit review on staged changes before each commit. The CodeRabbit CLI needs to authenticate with their API to run reviews. The hook supports two methods:
+A PreToolUse hook in `.claude/settings.json` intercepts `gh pr create` and runs CodeRabbit review on the full branch diff before allowing PR creation. If CodeRabbit finds blocking issues (severity=error), the PR creation is blocked and the agent fixes the findings before retrying.
 
-- **`coderabbit auth login`** — run once locally, opens a browser to sign in with GitHub. Free for public repos. Persists across sessions.
-- **`CODERABBIT_API_KEY`** env var — for headless environments (ACP session pods, CI) where a browser isn't available.
-
-The hook checks for both automatically. If neither is present, it prints a message and allows the commit to proceed — it never blocks your workflow.
+This is the enforcement point for the inner-loop review described in [ADR-0008](../../../internal/adr/0008-automate-code-reviews.md). The same script works standalone for CI:
 
 ```bash
-# Install pre-commit hooks (includes CodeRabbit)
-make setup-hooks
-
-# Or run manually
-scripts/pre-commit/coderabbit-review.sh
+# Run the review gate directly (outside of Claude Code)
+bash scripts/hooks/coderabbit-review-gate.sh
 ```
 
 ## How It Works in ACP Sessions
