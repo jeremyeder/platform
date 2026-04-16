@@ -39,6 +39,16 @@
           "value": "workspace"
         }
       ]
+    },
+    {
+      "name": "learning-agent-loop",
+      "description": "Enable the learning agent loop: memory citations in agent responses, corrections dashboard, and improvement pipeline visibility",
+      "tags": [
+        {
+          "type": "scope",
+          "value": "workspace"
+        }
+      ]
     }
   ]
 }

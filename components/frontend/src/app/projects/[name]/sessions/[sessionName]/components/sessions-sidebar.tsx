@@ -28,6 +28,7 @@ import {
   Share2,
   Key,
   Settings,
+  BookOpen,
   MoreHorizontal,
   MoreVertical,
   Cpu,
@@ -138,6 +139,11 @@ export function SessionsSidebar({
         label: "Access Keys",
         icon: Key,
         href: `/projects/${projectName}/keys`,
+      },
+      {
+        label: "Learning",
+        icon: BookOpen,
+        href: `/projects/${projectName}/learning`,
       },
       {
         label: "Workspace Settings",
