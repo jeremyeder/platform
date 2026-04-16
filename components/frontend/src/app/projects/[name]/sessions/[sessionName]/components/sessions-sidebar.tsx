@@ -120,7 +120,7 @@ export function SessionsSidebar({
 
   const hasMore = sessions.length > INITIAL_RECENTS_COUNT && !showAll;
 
-  const { data: learningEnabled } = useWorkspaceFlag(projectName, "learning-agent-loop");
+  const { enabled: learningEnabled } = useWorkspaceFlag(projectName, "learning-agent-loop");
 
   const navItems: NavItem[] = useMemo(
     () => [
