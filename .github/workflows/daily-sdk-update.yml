@@ -105,7 +105,7 @@ jobs:
           CURRENT: ${{ steps.current.outputs.current }}
         run: |
           # Escape dots for sed regex
-          CURRENT_ESC=$(echo "$CURRENT" | sed 's/\./\\./g')
+          CURRENT_ESC=${CURRENT//./\\.}
 
           sed -i "s/\"claude-agent-sdk>=${CURRENT_ESC}\"/\"claude-agent-sdk>=${LATEST}\"/" \
             components/runners/claude-code-runner/pyproject.toml
