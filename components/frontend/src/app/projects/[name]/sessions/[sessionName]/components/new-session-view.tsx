@@ -155,16 +155,17 @@ export function NewSessionView({
     // Require either a prompt OR a workflow with startupPrompt
     if (!trimmed && !hasWorkflow) return;
 
-    // Collect SDK options, filtering out undefined/empty/default values
+    // SDK options are only sent when the user explicitly saved them via the
+    // AdvancedSdkOptions component. The component filters out defaults and
+    // empty values internally. We check the form's dirty state here to see
+    // if any non-default options were committed.
     const rawOpts = sdkOptionsForm.getValues();
     const sdkOptions: Record<string, unknown> = {};
     const defaults = claudeAgentOptionsDefaults as Record<string, unknown>;
     for (const [key, value] of Object.entries(rawOpts)) {
       if (value === undefined || value === "" || value === null) continue;
-      // Skip arrays/objects that are empty
       if (Array.isArray(value) && value.length === 0) continue;
       if (typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0) continue;
-      // Skip values that match defaults
       if (key in defaults && JSON.stringify(value) === JSON.stringify(defaults[key])) continue;
       sdkOptions[key] = value;
     }

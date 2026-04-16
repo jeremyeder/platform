@@ -73,12 +73,12 @@ type CreateAgenticSessionRequest struct {
 	ParentSessionID      string                 `json:"parent_session_id,omitempty"`
 	Repos                []SimpleRepo           `json:"repos,omitempty"`
 	ActiveWorkflow       *WorkflowSelection     `json:"activeWorkflow,omitempty"`
-	UserContext          *UserContext            `json:"userContext,omitempty"`
-	EnvironmentVariables map[string]string       `json:"environmentVariables,omitempty"`
-	Labels               map[string]string       `json:"labels,omitempty"`
-	Annotations          map[string]string       `json:"annotations,omitempty"`
-	MCPServers           *MCPServersConfig       `json:"mcpServers,omitempty"`
-	SdkOptions           map[string]interface{}  `json:"sdkOptions,omitempty"`
+	UserContext          *UserContext           `json:"userContext,omitempty"`
+	EnvironmentVariables map[string]string      `json:"environmentVariables,omitempty"`
+	Labels               map[string]string      `json:"labels,omitempty"`
+	Annotations          map[string]string      `json:"annotations,omitempty"`
+	MCPServers           *MCPServersConfig      `json:"mcpServers,omitempty"`
+	SdkOptions           map[string]interface{} `json:"sdkOptions,omitempty"`
 }
 
 type CloneSessionRequest struct {

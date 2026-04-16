@@ -78,11 +78,10 @@ describe("AdvancedSdkOptions", () => {
 
     renderWithForm();
     expect(screen.getByText("Advanced SDK Options")).toBeDefined();
-    // The form fields should NOT be visible when collapsed
     expect(screen.queryByTestId("agent-options-fields")).toBeNull();
   });
 
-  it("expands on click to show form fields", () => {
+  it("expands on click to show form fields and save button", () => {
     mockUseWorkspaceFlag.mockReturnValue({
       enabled: true,
       isLoading: false,
@@ -91,27 +90,32 @@ describe("AdvancedSdkOptions", () => {
     });
 
     renderWithForm();
-    const trigger = screen.getByText("Advanced SDK Options");
-    fireEvent.click(trigger);
-
-    expect(screen.getByTestId("agent-options-fields")).toBeDefined();
-  });
-
-  it("shows form fields when expanded", () => {
-    mockUseWorkspaceFlag.mockReturnValue({
-      enabled: true,
-      isLoading: false,
-      error: null,
-      source: undefined,
-    });
-
-    renderWithForm();
-    // Click to expand
     fireEvent.click(screen.getByText("Advanced SDK Options"));
 
-    const fields = screen.getByTestId("agent-options-fields");
-    expect(fields).toBeDefined();
-    expect(fields.textContent).toContain("Agent Options Fields");
+    expect(screen.getByTestId("agent-options-fields")).toBeDefined();
+    expect(screen.getByText("Save Options")).toBeDefined();
+    expect(screen.getByText("Cancel")).toBeDefined();
+  });
+
+  it("shows compact summary after save", () => {
+    mockUseWorkspaceFlag.mockReturnValue({
+      enabled: true,
+      isLoading: false,
+      error: null,
+      source: undefined,
+    });
+
+    renderWithForm();
+
+    // Expand
+    fireEvent.click(screen.getByText("Advanced SDK Options"));
+    expect(screen.getByTestId("agent-options-fields")).toBeDefined();
+
+    // Save (with defaults — summary will be empty, so it goes back to collapsed)
+    fireEvent.click(screen.getByText("Save Options"));
+
+    // Form should collapse — no longer editing
+    expect(screen.queryByTestId("agent-options-fields")).toBeNull();
   });
 
   it("calls useWorkspaceFlag with correct project and flag name", () => {
@@ -125,7 +129,7 @@ describe("AdvancedSdkOptions", () => {
     renderWithForm();
     expect(mockUseWorkspaceFlag).toHaveBeenCalledWith(
       "test-project",
-      "advanced-sdk-options"
+      "advanced-sdk-options",
     );
   });
 });
