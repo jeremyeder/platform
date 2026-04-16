@@ -40,6 +40,10 @@ vi.mock('../workflow-selector', () => ({
   WorkflowSelector: () => <button data-testid="workflow-selector">No workflow</button>,
 }));
 
+vi.mock('@/components/advanced-sdk-options', () => ({
+  AdvancedSdkOptions: () => null,
+}));
+
 vi.mock('../modals/add-context-modal', () => ({
   AddContextModal: ({ onAddRepository }: { open: boolean; onAddRepository: (url: string, branch: string, autoPush?: boolean) => Promise<void> }) => (
     <>

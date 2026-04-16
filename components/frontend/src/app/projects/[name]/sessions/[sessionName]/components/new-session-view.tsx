@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { MessageSquarePlus, ArrowUp, Loader2, Plus, GitBranch, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +27,12 @@ import { useRunnerTypes } from "@/services/queries/use-runner-types";
 import { useModels } from "@/services/queries/use-models";
 import { DEFAULT_RUNNER_TYPE_ID } from "@/services/api/runner-types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { AdvancedSdkOptions } from "@/components/advanced-sdk-options";
+import {
+  claudeAgentOptionsSchema,
+  claudeAgentOptionsDefaults,
+  type ClaudeAgentOptionsForm,
+} from "@/components/claude-agent-options";
 import type { WorkflowConfig } from "../lib/types";
 
 const MENU_VERSION = "2026-04-16";
@@ -44,6 +52,7 @@ type NewSessionViewProps = {
     model: string;
     workflow?: string;
     repos?: Array<{ url: string; branch?: string; autoPush?: boolean }>;
+    sdkOptions?: Record<string, unknown>;
   }) => void;
   ootbWorkflows: WorkflowConfig[];
   onLoadCustomWorkflow?: () => void;
@@ -67,6 +76,11 @@ export function NewSessionView({
       setMenuSeenVersion(MENU_VERSION);
     }
   }, [menuSeenVersion, setMenuSeenVersion]);
+
+  const sdkOptionsForm = useForm<ClaudeAgentOptionsForm>({
+    resolver: zodResolver(claudeAgentOptionsSchema),
+    defaultValues: claudeAgentOptionsDefaults,
+  });
 
   const [prompt, setPrompt] = useState("");
   const [selectedRunner, setSelectedRunner] = useState<string>(DEFAULT_RUNNER_TYPE_ID);
@@ -141,14 +155,29 @@ export function NewSessionView({
     // Require either a prompt OR a workflow with startupPrompt
     if (!trimmed && !hasWorkflow) return;
 
+    // Collect SDK options, filtering out undefined/empty/default values
+    const rawOpts = sdkOptionsForm.getValues();
+    const sdkOptions: Record<string, unknown> = {};
+    const defaults = claudeAgentOptionsDefaults as Record<string, unknown>;
+    for (const [key, value] of Object.entries(rawOpts)) {
+      if (value === undefined || value === "" || value === null) continue;
+      // Skip arrays/objects that are empty
+      if (Array.isArray(value) && value.length === 0) continue;
+      if (typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+      // Skip values that match defaults
+      if (key in defaults && JSON.stringify(value) === JSON.stringify(defaults[key])) continue;
+      sdkOptions[key] = value;
+    }
+
     onCreateSession({
       prompt: trimmed,
       runner: selectedRunner,
       model: selectedModel,
       workflow: hasWorkflow ? selectedWorkflow : undefined,
       repos: pendingRepos.length > 0 ? pendingRepos.map((r) => ({ url: r.url, branch: r.branch, autoPush: r.autoPush })) : undefined,
+      sdkOptions: Object.keys(sdkOptions).length > 0 ? sdkOptions : undefined,
     });
-  }, [prompt, selectedRunner, selectedModel, selectedWorkflow, pendingRepos, onCreateSession]);
+  }, [prompt, selectedRunner, selectedModel, selectedWorkflow, pendingRepos, sdkOptionsForm, onCreateSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -272,6 +301,13 @@ export function NewSessionView({
             ))}
           </div>
         )}
+
+        {/* Advanced SDK Options (gated by workspace flag) */}
+        <AdvancedSdkOptions
+          projectName={projectName}
+          form={sdkOptionsForm}
+          disabled={isSubmitting}
+        />
 
       </div>
 
