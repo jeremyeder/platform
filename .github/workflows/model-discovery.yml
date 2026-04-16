@@ -89,10 +89,18 @@ jobs:
           labels: automated,models
           delete-branch: true
 
+      - name: Generate app token
+        if: steps.create-pr.outputs.pull-request-number
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AMBIENT_APP_ID }}
+          private-key: ${{ secrets.AMBIENT_APP_PRIVATE_KEY }}
+
       - name: Approve PR
         if: steps.create-pr.outputs.pull-request-number
         env:
-          GH_TOKEN: ${{ secrets.AMBIENT_BOT_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ steps.create-pr.outputs.pull-request-number }}
         run: gh pr review "$PR_NUMBER" --approve --body "Manifest validation passed — auto-approved by model discovery workflow"
 
