@@ -28,6 +28,7 @@ import {
   Share2,
   Key,
   Settings,
+  Brain,
   MoreHorizontal,
   MoreVertical,
   Cpu,
@@ -143,6 +144,11 @@ export function SessionsSidebar({
         label: "Workspace Settings",
         icon: Settings,
         href: `/projects/${projectName}/settings`,
+      },
+      {
+        label: "Project Memory",
+        icon: Brain,
+        href: `/projects/${projectName}/memory`,
       },
     ],
     [projectName]

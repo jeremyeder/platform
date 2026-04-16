@@ -39,6 +39,16 @@
           "value": "workspace"
         }
       ]
+    },
+    {
+      "name": "learning-agent-loop",
+      "description": "Enable the learning agent loop features: Project Memory tab, suggest_memory tool, and memory injection",
+      "tags": [
+        {
+          "type": "scope",
+          "value": "workspace"
+        }
+      ]
     }
   ]
 }
