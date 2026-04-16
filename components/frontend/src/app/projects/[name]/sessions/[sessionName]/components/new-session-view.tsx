@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { MessageSquarePlus, ArrowUp, Loader2, Plus, GitBranch, Upload, X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { MessageSquarePlus, ArrowUp, Loader2, Plus, GitBranch, Upload, X, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +33,13 @@ import { useRunnerTypes } from "@/services/queries/use-runner-types";
 import { useModels } from "@/services/queries/use-models";
 import { DEFAULT_RUNNER_TYPE_ID } from "@/services/api/runner-types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useWorkspaceFlag } from "@/services/queries/use-feature-flags-admin";
+import { AdvancedSdkOptions } from "@/components/advanced-sdk-options";
+import {
+  claudeAgentOptionsSchema,
+  claudeAgentOptionsDefaults,
+  type ClaudeAgentOptionsForm,
+} from "@/components/claude-agent-options";
 import type { WorkflowConfig } from "../lib/types";
 
 const MENU_VERSION = "2026-04-16";
@@ -44,6 +59,7 @@ type NewSessionViewProps = {
     model: string;
     workflow?: string;
     repos?: Array<{ url: string; branch?: string; autoPush?: boolean }>;
+    sdkOptions?: Record<string, unknown>;
   }) => void;
   ootbWorkflows: WorkflowConfig[];
   onLoadCustomWorkflow?: () => void;
@@ -67,6 +83,14 @@ export function NewSessionView({
       setMenuSeenVersion(MENU_VERSION);
     }
   }, [menuSeenVersion, setMenuSeenVersion]);
+
+  const { enabled: sdkOptionsEnabled } = useWorkspaceFlag(projectName, "advanced-sdk-options");
+
+  const sdkOptionsForm = useForm<ClaudeAgentOptionsForm>({
+    resolver: zodResolver(claudeAgentOptionsSchema),
+    defaultValues: claudeAgentOptionsDefaults,
+  });
+  const [sdkOptionsDialogOpen, setSdkOptionsDialogOpen] = useState(false);
 
   const [prompt, setPrompt] = useState("");
   const [selectedRunner, setSelectedRunner] = useState<string>(DEFAULT_RUNNER_TYPE_ID);
@@ -141,14 +165,30 @@ export function NewSessionView({
     // Require either a prompt OR a workflow with startupPrompt
     if (!trimmed && !hasWorkflow) return;
 
+    // SDK options are only sent when the user explicitly saved them via the
+    // AdvancedSdkOptions component. The component filters out defaults and
+    // empty values internally. We check the form's dirty state here to see
+    // if any non-default options were committed.
+    const rawOpts = sdkOptionsForm.getValues();
+    const sdkOptions: Record<string, unknown> = {};
+    const defaults = claudeAgentOptionsDefaults as Record<string, unknown>;
+    for (const [key, value] of Object.entries(rawOpts)) {
+      if (value === undefined || value === "" || value === null) continue;
+      if (Array.isArray(value) && value.length === 0) continue;
+      if (typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+      if (key in defaults && JSON.stringify(value) === JSON.stringify(defaults[key])) continue;
+      sdkOptions[key] = value;
+    }
+
     onCreateSession({
       prompt: trimmed,
       runner: selectedRunner,
       model: selectedModel,
       workflow: hasWorkflow ? selectedWorkflow : undefined,
       repos: pendingRepos.length > 0 ? pendingRepos.map((r) => ({ url: r.url, branch: r.branch, autoPush: r.autoPush })) : undefined,
+      sdkOptions: Object.keys(sdkOptions).length > 0 ? sdkOptions : undefined,
     });
-  }, [prompt, selectedRunner, selectedModel, selectedWorkflow, pendingRepos, onCreateSession]);
+  }, [prompt, selectedRunner, selectedModel, selectedWorkflow, pendingRepos, sdkOptionsForm, onCreateSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -208,7 +248,15 @@ export function NewSessionView({
                     <Upload className="w-4 h-4 mr-2" />
                     Upload File
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {sdkOptionsEnabled && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setSdkOptionsDialogOpen(true)}>
+                        <Settings2 className="w-4 h-4 mr-2" />
+                        SDK Options...
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               <RunnerModelSelector
@@ -274,6 +322,21 @@ export function NewSessionView({
         )}
 
       </div>
+
+      {/* SDK Options Dialog (opened from + menu) */}
+      <Dialog open={sdkOptionsDialogOpen} onOpenChange={setSdkOptionsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>SDK Options</DialogTitle>
+          </DialogHeader>
+          <AdvancedSdkOptions
+            projectName={projectName}
+            form={sdkOptionsForm}
+            disabled={isSubmitting}
+            onSave={() => setSdkOptionsDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       <AddContextModal
         open={contextModalOpen}
