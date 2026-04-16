@@ -104,7 +104,7 @@ def _parse_sdk_options(
                     merged["text"] = merged["text"] + suffix
                 else:
                     # Unknown dict shape — add an "append" field
-                    merged["append"] = value
+                    merged["append"] = suffix
                 result["system_prompt"] = merged
             elif isinstance(existing_system_prompt, str):
                 result["system_prompt"] = existing_system_prompt + suffix

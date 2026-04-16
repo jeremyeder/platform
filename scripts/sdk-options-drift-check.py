@@ -74,7 +74,7 @@ def load_manifest() -> dict:
     if not MANIFEST_PATH.exists():
         print(f"ERROR: Manifest not found at {MANIFEST_PATH}", file=sys.stderr)
         sys.exit(2)
-    with open(MANIFEST_PATH) as fh:
+    with open(MANIFEST_PATH, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -89,7 +89,7 @@ def write_manifest(
         "sdkVersion": sdk_version,
         "options": current_fields,
     }
-    with open(MANIFEST_PATH, "w") as fh:
+    with open(MANIFEST_PATH, "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=2)
         fh.write("\n")
     print(f"Updated manifest written to {MANIFEST_PATH}")
