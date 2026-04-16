@@ -46,11 +46,12 @@ A typical learned file looks like this:
 
 ```markdown
 ---
-title: Use GetK8sClientsForRequest for user-facing endpoints
 type: pattern
-source: session
-confidence: high
-tags: [backend, auth, go]
+date: 2026-04-10T14:30:00Z
+session: session-abc123
+project: platform
+author: Agent
+title: "Use GetK8sClientsForRequest for user-facing endpoints"
 ---
 
 All user-facing API handlers must use `GetK8sClientsForRequest(c)` to
@@ -62,7 +63,7 @@ The only exception is internal health-check endpoints that do not
 act on user data.
 ```
 
-The frontmatter gives you context at a glance: what kind of knowledge it is, where it came from, and how confident the agent was.
+The frontmatter gives you context at a glance: what kind of knowledge it is, which session discovered it, and who wrote it.
 
 ## How to Review
 
@@ -90,11 +91,11 @@ When you open a CL draft PR, run through this checklist:
 Once you merge a CL pull request, here is what happens:
 
 1. The learned file lands on the default branch in `docs/learned/`.
-2. When the next session starts, the runner reads all files in `docs/learned/` during initialization.
-3. The knowledge is injected into the agent's system prompt under a `## Project Memory` section.
+2. The wiki compiler (`llm-wiki-compiler`) runs — either on push via GitHub Action or manually — and compiles `docs/learned/` along with other documentation sources into topic-based wiki articles.
+3. The compiled knowledge is surfaced through the project's `CLAUDE.md` (or equivalent project instructions), which the agent loads naturally at session start.
 4. The agent uses this knowledge throughout the session. When it applies a learned convention, it cites the source with a `[memory:PM-XXX]` badge in its response.
 
-This means your triage decisions have a direct, visible effect. Merged knowledge shows up in agent responses. Closed PRs disappear. You control what your agents remember.
+There is no custom file-reading code in the runner. Knowledge flows through the same path as all other project documentation — the wiki compiler distills it, `CLAUDE.md` references it, and the agent picks it up. This means your triage decisions have a direct, visible effect. Merged knowledge shows up in agent responses. Closed PRs disappear. You control what your agents remember.
 
 ## Where Knowledge Comes From
 
