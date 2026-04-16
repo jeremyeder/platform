@@ -51,6 +51,8 @@ _SDK_OPTIONS_DENYLIST = frozenset(
         "continue_conversation",
         "add_dirs",
         "api_key",
+        "cli_path",
+        "env",
     }
 )
 

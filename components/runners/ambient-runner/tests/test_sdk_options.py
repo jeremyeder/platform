@@ -111,6 +111,8 @@ class TestParseSdkOptionsDenylist:
             "resume",
             "continue_conversation",
             "add_dirs",
+            "cli_path",
+            "env",
         }
         assert _SDK_OPTIONS_DENYLIST == expected
 
