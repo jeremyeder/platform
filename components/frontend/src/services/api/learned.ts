@@ -54,6 +54,7 @@ export type CreateMemoryRequest = {
   title: string;
   content: string;
   type: 'correction' | 'pattern';
+  repo?: string;
 };
 
 /**

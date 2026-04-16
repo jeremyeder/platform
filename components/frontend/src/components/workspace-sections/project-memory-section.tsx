@@ -48,6 +48,7 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
     title: "",
     content: "",
     type: "correction" as "correction" | "pattern",
+    repo: "",
   });
 
   const {
@@ -84,13 +85,14 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
           title: newMemory.title.trim(),
           content: newMemory.content.trim(),
           type: newMemory.type,
+          ...(newMemory.repo.trim() ? { repo: newMemory.repo.trim() } : {}),
         },
       },
       {
         onSuccess: (result) => {
           toast.success("Memory created successfully");
           setAddDialogOpen(false);
-          setNewMemory({ title: "", content: "", type: "correction" });
+          setNewMemory({ title: "", content: "", type: "correction", repo: "" });
           if (result.prUrl) {
             window.open(result.prUrl, "_blank");
           }
@@ -370,11 +372,13 @@ type AddMemoryButtonProps = {
     title: string;
     content: string;
     type: "correction" | "pattern";
+    repo: string;
   };
   setNewMemory: (m: {
     title: string;
     content: string;
     type: "correction" | "pattern";
+    repo: string;
   }) => void;
   onSubmit: () => void;
   isPending: boolean;
@@ -400,11 +404,25 @@ function AddMemoryButton({
         <DialogHeader>
           <DialogTitle>Add Project Memory</DialogTitle>
           <DialogDescription>
-            Create a new memory entry. This will open a PR in the workspace
+            Create a new memory entry. This will open a draft PR in the target
             repository.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="memory-repo">Target Repository</Label>
+            <Input
+              id="memory-repo"
+              placeholder="owner/repo (e.g. jeremyeder/continuous-learning-example)"
+              value={newMemory.repo}
+              onChange={(e) =>
+                setNewMemory({ ...newMemory, repo: e.target.value })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              GitHub repository where the learned file will be added as a draft PR
+            </p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="memory-title">Title</Label>
             <Input
@@ -462,7 +480,8 @@ function AddMemoryButton({
             disabled={
               isPending ||
               !newMemory.title.trim() ||
-              !newMemory.content.trim()
+              !newMemory.content.trim() ||
+              !newMemory.repo.trim()
             }
           >
             {isPending ? (

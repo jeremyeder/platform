@@ -16,10 +16,11 @@ export async function POST(
     const headers = await buildForwardHeadersAsync(request);
     const body = await request.json();
 
-    const { title, content, type } = body as {
+    const { title, content, type, repo } = body as {
       title: string;
       content: string;
       type: "correction" | "pattern";
+      repo?: string;
     };
 
     if (!title || !content || !type) {
@@ -36,26 +37,25 @@ export async function POST(
       );
     }
 
-    // Get repo info from project
-    const projectRes = await fetch(
-      `${BACKEND_URL}/projects/${projectName}`,
-      { method: "GET", headers }
-    );
-    if (!projectRes.ok) {
-      return NextResponse.json(
-        { error: "Failed to get project info" },
-        { status: 500 }
+    // Resolve repo: use explicit repo from request, fall back to project annotation
+    let repoAnnotation = repo || "";
+    if (!repoAnnotation) {
+      const projectRes = await fetch(
+        `${BACKEND_URL}/projects/${projectName}`,
+        { method: "GET", headers }
       );
+      if (projectRes.ok) {
+        const project = await projectRes.json();
+        repoAnnotation =
+          project?.data?.annotations?.["ambient.ai/repo"] ||
+          project?.annotations?.["ambient.ai/repo"] ||
+          "";
+      }
     }
-    const project = await projectRes.json();
-    const repoAnnotation =
-      project?.data?.annotations?.["ambient.ai/repo"] ||
-      project?.annotations?.["ambient.ai/repo"] ||
-      "";
 
     if (!repoAnnotation) {
       return NextResponse.json(
-        { error: "No repository configured for this project" },
+        { error: "No repository specified. Enter a target repository (owner/repo)." },
         { status: 400 }
       );
     }
@@ -63,7 +63,7 @@ export async function POST(
     const ownerRepo = parseOwnerRepo(repoAnnotation);
     if (!ownerRepo) {
       return NextResponse.json(
-        { error: "Invalid repository URL" },
+        { error: "Invalid repository format. Use owner/repo (e.g. jeremyeder/continuous-learning-example)" },
         { status: 400 }
       );
     }
