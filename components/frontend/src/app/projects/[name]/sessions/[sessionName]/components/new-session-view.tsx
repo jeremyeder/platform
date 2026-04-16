@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { MessageSquarePlus, ArrowUp, Loader2, Plus, GitBranch, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import { AddContextModal } from "./modals/add-context-modal";
 import { useRunnerTypes } from "@/services/queries/use-runner-types";
 import { useModels } from "@/services/queries/use-models";
 import { DEFAULT_RUNNER_TYPE_ID } from "@/services/api/runner-types";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { WorkflowConfig } from "../lib/types";
 
 const MENU_VERSION = "2026-04-16";
@@ -58,27 +59,14 @@ export function NewSessionView({
 }: NewSessionViewProps) {
   const { data: runnerTypes } = useRunnerTypes(projectName);
 
-  const [showMenuDot, setShowMenuDot] = useState(false);
-
-  useEffect(() => {
-    try {
-      const seen = localStorage.getItem("acp-menu-seen-version");
-      if (seen !== MENU_VERSION) setShowMenuDot(true);
-    } catch {
-      // localStorage unavailable (private browsing) — no dot
-    }
-  }, []);
+  const [menuSeenVersion, setMenuSeenVersion] = useLocalStorage<string | null>("acp-menu-seen-version", null);
+  const showMenuDot = useMemo(() => menuSeenVersion !== MENU_VERSION, [menuSeenVersion]);
 
   const handleMenuOpenChange = useCallback((open: boolean) => {
-    if (open && showMenuDot) {
-      setShowMenuDot(false);
-      try {
-        localStorage.setItem("acp-menu-seen-version", MENU_VERSION);
-      } catch {
-        // localStorage unavailable
-      }
+    if (open && menuSeenVersion !== MENU_VERSION) {
+      setMenuSeenVersion(MENU_VERSION);
     }
-  }, [showMenuDot]);
+  }, [menuSeenVersion, setMenuSeenVersion]);
 
   const [prompt, setPrompt] = useState("");
   const [selectedRunner, setSelectedRunner] = useState<string>(DEFAULT_RUNNER_TYPE_ID);
