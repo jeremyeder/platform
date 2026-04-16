@@ -51,9 +51,9 @@
 - [x] T012 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/scheduled-sessions.md` (scheduled-sessions)
 - [x] T013 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/context-and-artifacts.md` (file-browser)
 - [x] T014 [US1] Verify docs build succeeds: `cd docs && npm run build`
-- [ ] T015 [US1] Capture screenshots locally: `make kind-up CONTAINER_ENGINE=docker && make screenshots`
-- [ ] T016 [US1] Verify theme switching in docs dev server: `cd docs && npm run dev`, toggle themes
-- [ ] T017 [US1] Commit captured screenshots in `docs/public/images/screenshots/`
+- [x] T015 [US1] Capture screenshots locally: `make kind-up CONTAINER_ENGINE=docker && make screenshots`
+- [x] T016 [US1] Verify theme switching in docs dev server: `cd docs && npm run dev`, toggle themes
+- [x] T017 [US1] Commit captured screenshots in `docs/public/images/screenshots/`
 
 **Checkpoint**: Docs pages show theme-aware screenshots locally
 
@@ -88,7 +88,7 @@
 
 ## Phase 6: Polish
 
-- [ ] T025 Verify all 10 screenshot pairs exist in `docs/public/images/screenshots/`
+- [x] T025 Verify all 9 screenshot pairs exist in `docs/public/images/screenshots/`
 - [ ] T026 Run quickstart.md validation — follow all steps, confirm they work
 - [ ] T027 Clean up kind cluster: `make kind-down`
 

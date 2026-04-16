@@ -20,8 +20,8 @@ After creating a session, you can attach one or more Git repositories from the s
 The agent clones each repository into its workspace and has full read/write access to the files.
 
 <figure class="screenshot-pair">
-  <img class="screenshot-light" src="/platform/images/screenshots/file-browser-light.png" alt="File browser and artifacts" />
-  <img class="screenshot-dark" src="/platform/images/screenshots/file-browser-dark.png" alt="File browser and artifacts" />
+  <img class="screenshot-light" src="/platform/images/screenshots/session-page-light.png" alt="Session with file browser and artifacts" />
+  <img class="screenshot-dark" src="/platform/images/screenshots/session-page-dark.png" alt="Session with file browser and artifacts" />
 </figure>
 
 ### Branch management

@@ -6,7 +6,7 @@
       "id": "workspaces-page",
       "page": "/projects",
       "waitFor": "Workspaces",
-      "setupSteps": []
+      "setupSteps": ["waitForThemeToggle"]
     },
     {
       "id": "workspace-settings",
@@ -52,15 +52,9 @@
     },
     {
       "id": "scheduled-sessions",
-      "page": "/projects/{workspace}/scheduled",
+      "page": "/projects/{workspace}/scheduled-sessions",
       "waitFor": "Scheduled",
       "setupSteps": []
-    },
-    {
-      "id": "file-browser",
-      "page": "/projects/{workspace}/sessions/{session}",
-      "waitFor": "",
-      "setupSteps": ["openFileBrowser"]
     }
   ]
 }

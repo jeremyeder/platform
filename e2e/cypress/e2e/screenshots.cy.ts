@@ -145,11 +145,16 @@ function runSetupStep(step: string): void {
       cy.contains('API Keys', { timeout: 5000 }).click()
       cy.wait(500)
       break
-    case 'openFileBrowser':
+    case 'waitForThemeToggle':
+      cy.get('button[aria-label="Toggle theme"]', { timeout: 10000 }).should('be.visible')
+      cy.wait(500)
+      break
+    case 'openFileBrowserTab':
+      // Click the Files tab in the explorer panel if visible
       cy.get('body').then(($body) => {
-        const accordion = $body.find('[data-testid="shared-artifacts"]')
-        if (accordion.length) {
-          cy.wrap(accordion).click()
+        const filesTab = $body.find('button:contains("Files"), [role="tab"]:contains("Files")')
+        if (filesTab.length) {
+          cy.wrap(filesTab.first()).click({ force: true })
           cy.wait(500)
         }
       })

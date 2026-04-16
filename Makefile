@@ -955,7 +955,7 @@ screenshots: ## Capture documentation screenshots against running kind cluster
 		CYPRESS_ANTHROPIC_API_KEY=mock-replay-key \
 		npx cypress run --browser chrome --spec cypress/e2e/screenshots.cy.ts
 	@mkdir -p docs/public/images/screenshots
-	@cp e2e/cypress/screenshots/output/*.png docs/public/images/screenshots/
+	@find e2e/cypress/screenshots/output -name '*.png' ! -name '*failed*' -exec cp {} docs/public/images/screenshots/ \;
 	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Screenshots updated in docs/public/images/screenshots/"
 
 screenshots-headed: ## Open Cypress for screenshot debugging
