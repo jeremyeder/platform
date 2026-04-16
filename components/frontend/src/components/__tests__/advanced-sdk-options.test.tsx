@@ -9,17 +9,6 @@ import {
   type ClaudeAgentOptionsForm,
 } from "../claude-agent-options";
 
-// Mock useWorkspaceFlag
-const mockUseWorkspaceFlag = vi.fn(() => ({
-  enabled: false,
-  isLoading: false,
-  error: null,
-  source: undefined,
-}));
-vi.mock("@/services/queries/use-feature-flags-admin", () => ({
-  useWorkspaceFlag: (...args: unknown[]) => mockUseWorkspaceFlag(...args),
-}));
-
 // Mock AgentOptionsFields to avoid rendering the full form tree
 vi.mock("../claude-agent-options", async () => {
   const actual = await vi.importActual("../claude-agent-options");
@@ -33,8 +22,8 @@ vi.mock("../claude-agent-options", async () => {
   };
 });
 
-// Helper to render the component with a form
-function renderWithForm(props?: { disabled?: boolean }) {
+function renderWithForm(props?: { disabled?: boolean; onSave?: () => void }) {
+  const onSave = props?.onSave ?? vi.fn();
   function TestHarness() {
     const form = useForm<ClaudeAgentOptionsForm>({
       resolver: zodResolver(claudeAgentOptionsSchema),
@@ -45,10 +34,11 @@ function renderWithForm(props?: { disabled?: boolean }) {
         projectName="test-project"
         form={form}
         disabled={props?.disabled}
+        onSave={onSave}
       />
     );
   }
-  return render(<TestHarness />);
+  return { ...render(<TestHarness />), onSave };
 }
 
 describe("AdvancedSdkOptions", () => {
@@ -56,80 +46,28 @@ describe("AdvancedSdkOptions", () => {
     vi.clearAllMocks();
   });
 
-  it("renders nothing when advanced-sdk-options flag is false", () => {
-    mockUseWorkspaceFlag.mockReturnValue({
-      enabled: false,
-      isLoading: false,
-      error: null,
-      source: undefined,
-    });
-
-    const { container } = renderWithForm();
-    expect(container.innerHTML).toBe("");
-  });
-
-  it("renders collapsed by default when flag is true", () => {
-    mockUseWorkspaceFlag.mockReturnValue({
-      enabled: true,
-      isLoading: false,
-      error: null,
-      source: undefined,
-    });
-
+  it("renders form fields and save/cancel buttons", () => {
     renderWithForm();
-    expect(screen.getByText("Advanced SDK Options")).toBeDefined();
-    expect(screen.queryByTestId("agent-options-fields")).toBeNull();
-  });
-
-  it("expands on click to show form fields and save button", () => {
-    mockUseWorkspaceFlag.mockReturnValue({
-      enabled: true,
-      isLoading: false,
-      error: null,
-      source: undefined,
-    });
-
-    renderWithForm();
-    fireEvent.click(screen.getByText("Advanced SDK Options"));
-
     expect(screen.getByTestId("agent-options-fields")).toBeDefined();
     expect(screen.getByText("Save Options")).toBeDefined();
     expect(screen.getByText("Cancel")).toBeDefined();
   });
 
-  it("shows compact summary after save", () => {
-    mockUseWorkspaceFlag.mockReturnValue({
-      enabled: true,
-      isLoading: false,
-      error: null,
-      source: undefined,
-    });
-
-    renderWithForm();
-
-    // Expand
-    fireEvent.click(screen.getByText("Advanced SDK Options"));
-    expect(screen.getByTestId("agent-options-fields")).toBeDefined();
-
-    // Save (with defaults — summary will be empty, so it goes back to collapsed)
+  it("calls onSave when Save Options is clicked", () => {
+    const { onSave } = renderWithForm();
     fireEvent.click(screen.getByText("Save Options"));
-
-    // Form should collapse — no longer editing
-    expect(screen.queryByTestId("agent-options-fields")).toBeNull();
+    expect(onSave).toHaveBeenCalled();
   });
 
-  it("calls useWorkspaceFlag with correct project and flag name", () => {
-    mockUseWorkspaceFlag.mockReturnValue({
-      enabled: false,
-      isLoading: false,
-      error: null,
-      source: undefined,
-    });
+  it("calls onSave when Cancel is clicked with no changes", () => {
+    const { onSave } = renderWithForm();
+    fireEvent.click(screen.getByText("Cancel"));
+    expect(onSave).toHaveBeenCalled();
+  });
 
-    renderWithForm();
-    expect(mockUseWorkspaceFlag).toHaveBeenCalledWith(
-      "test-project",
-      "advanced-sdk-options",
-    );
+  it("disables buttons when disabled prop is true", () => {
+    renderWithForm({ disabled: true });
+    const saveBtn = screen.getByText("Save Options").closest("button");
+    expect(saveBtn?.hasAttribute("disabled")).toBe(true);
   });
 });

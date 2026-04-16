@@ -40,6 +40,14 @@ vi.mock('../workflow-selector', () => ({
   WorkflowSelector: () => <button data-testid="workflow-selector">No workflow</button>,
 }));
 
+vi.mock('@/hooks/use-local-storage', () => ({
+  useLocalStorage: () => [null, vi.fn()],
+}));
+
+vi.mock('@/services/queries/use-feature-flags-admin', () => ({
+  useWorkspaceFlag: () => ({ enabled: false, isLoading: false, error: null, source: undefined }),
+}));
+
 vi.mock('@/components/advanced-sdk-options', () => ({
   AdvancedSdkOptions: () => null,
 }));

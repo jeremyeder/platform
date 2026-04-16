@@ -3,10 +3,16 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { MessageSquarePlus, ArrowUp, Loader2, Plus, GitBranch, Upload, X } from "lucide-react";
+import { MessageSquarePlus, ArrowUp, Loader2, Plus, GitBranch, Upload, X, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +33,7 @@ import { useRunnerTypes } from "@/services/queries/use-runner-types";
 import { useModels } from "@/services/queries/use-models";
 import { DEFAULT_RUNNER_TYPE_ID } from "@/services/api/runner-types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useWorkspaceFlag } from "@/services/queries/use-feature-flags-admin";
 import { AdvancedSdkOptions } from "@/components/advanced-sdk-options";
 import {
   claudeAgentOptionsSchema,
@@ -77,10 +84,13 @@ export function NewSessionView({
     }
   }, [menuSeenVersion, setMenuSeenVersion]);
 
+  const { enabled: sdkOptionsEnabled } = useWorkspaceFlag(projectName, "advanced-sdk-options");
+
   const sdkOptionsForm = useForm<ClaudeAgentOptionsForm>({
     resolver: zodResolver(claudeAgentOptionsSchema),
     defaultValues: claudeAgentOptionsDefaults,
   });
+  const [sdkOptionsDialogOpen, setSdkOptionsDialogOpen] = useState(false);
 
   const [prompt, setPrompt] = useState("");
   const [selectedRunner, setSelectedRunner] = useState<string>(DEFAULT_RUNNER_TYPE_ID);
@@ -238,7 +248,15 @@ export function NewSessionView({
                     <Upload className="w-4 h-4 mr-2" />
                     Upload File
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {sdkOptionsEnabled && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setSdkOptionsDialogOpen(true)}>
+                        <Settings2 className="w-4 h-4 mr-2" />
+                        SDK Options...
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               <RunnerModelSelector
@@ -303,14 +321,22 @@ export function NewSessionView({
           </div>
         )}
 
-        {/* Advanced SDK Options (gated by workspace flag) */}
-        <AdvancedSdkOptions
-          projectName={projectName}
-          form={sdkOptionsForm}
-          disabled={isSubmitting}
-        />
-
       </div>
+
+      {/* SDK Options Dialog (opened from + menu) */}
+      <Dialog open={sdkOptionsDialogOpen} onOpenChange={setSdkOptionsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>SDK Options</DialogTitle>
+          </DialogHeader>
+          <AdvancedSdkOptions
+            projectName={projectName}
+            form={sdkOptionsForm}
+            disabled={isSubmitting}
+            onSave={() => setSdkOptionsDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       <AddContextModal
         open={contextModalOpen}
