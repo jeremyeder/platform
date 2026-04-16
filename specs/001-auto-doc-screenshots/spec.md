@@ -66,7 +66,7 @@ Netlify deploys docs on every push to `main` (current/live). GitHub Pages deploy
 ### Functional Requirements
 
 - **FR-001**: System MUST capture screenshots of specified pages in both light and dark themes, producing paired PNGs named `{id}-light.png` and `{id}-dark.png`.
-- **FR-002**: Screenshot targets MUST be declared in a JSON manifest (page URL, wait condition, optional selector/crop, setup steps).
+- **FR-002**: Screenshot targets MUST be declared in a JSON manifest (page URL, wait condition, setup steps).
 - **FR-003**: Documentation MUST display the correct screenshot variant based on Starlight theme, using pure CSS in standard markdown (no MDX).
 - **FR-004**: The daily CI workflow MUST open a PR with updated screenshots only when changes are detected, never committing directly to `main`.
 - **FR-005**: The CI workflow MUST clean up all resources (kind cluster) on completion regardless of outcome.

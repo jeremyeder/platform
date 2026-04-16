@@ -31,8 +31,10 @@
 - [ ] T005 Create Cypress screenshot spec at `e2e/cypress/e2e/screenshots.cy.ts` with manifest-driven capture, theme toggling, workspace/session setup, and setup step handlers
 - [ ] T006 [P] Add `screenshotsFolder` and DPI normalization (`CYPRESS_SCREENSHOT_MODE`) to `e2e/cypress.config.ts`
 - [ ] T007 Add `screenshots`, `screenshots-headed`, `screenshots-clean` targets to `Makefile`
+- [ ] T007a Create Netlify config at `docs/netlify.toml` with build command (`npm ci && npx playwright install chromium && npm run build`), `/platform/*` redirect
+- [ ] T007b Update `docs/astro.config.mjs` for environment-aware `site`/`base` using `process.env.NETLIFY`
 
-**Checkpoint**: `make screenshots` can run against a kind cluster (images won't exist in docs yet)
+**Checkpoint**: `make screenshots` can run against a kind cluster; Netlify site renders with correct CSS
 
 ---
 
@@ -76,11 +78,9 @@
 
 **Independent Test**: Push docs change to main — appears on Netlify, not on GitHub Pages.
 
-- [ ] T020 [US3] Create Netlify config at `docs/netlify.toml` with build command, `/platform/*` redirect
-- [ ] T021 [US3] Update `docs/astro.config.mjs` for environment-aware `site`/`base` using `process.env.NETLIFY`
-- [ ] T022 [US3] Change `.github/workflows/docs.yml` trigger from `push: branches: [main]` to `push: tags: ['v*']`
-- [ ] T023 [US3] Verify local docs build: `cd docs && npm run build`
-- [ ] T024 [US3] Push to main, verify Netlify deploys with correct CSS and screenshot paths
+- [ ] T020 [US3] Change `.github/workflows/docs.yml` trigger from `push: branches: [main]` to `push: tags: ['v*']`
+- [ ] T021 [US3] Verify local docs build: `cd docs && npm run build`
+- [ ] T022 [US3] Push to main, verify Netlify deploys with correct CSS and screenshot paths
 
 **Checkpoint**: Two-tier hosting operational — Netlify for main, GitHub Pages for releases
 
