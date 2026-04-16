@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputWithHistory } from "@/components/input-with-history";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +33,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useLearnedFiles, useLearnedDraftPRs, useCreateMemory } from "@/services/queries/use-learned";
+import { useInputHistory } from "@/hooks/use-input-history";
 import type { LearnedEntry, LearnedDraftPR } from "@/services/api/learned";
 
 type ProjectMemorySectionProps = {
@@ -66,6 +68,7 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
   } = useLearnedDraftPRs(projectName);
 
   const createMemory = useCreateMemory();
+  const { addToHistory: addRepoToHistory } = useInputHistory("memory-target-repo");
 
   const entries = learnedData?.entries || [];
   const totalCount = learnedData?.totalCount || 0;
@@ -90,6 +93,9 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
       },
       {
         onSuccess: (result) => {
+          if (newMemory.repo.trim()) {
+            addRepoToHistory(newMemory.repo.trim());
+          }
           toast.success("Memory created successfully");
           setAddDialogOpen(false);
           setNewMemory({ title: "", content: "", type: "correction", repo: "" });
@@ -411,8 +417,9 @@ function AddMemoryButton({
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="memory-repo">Target Repository</Label>
-            <Input
+            <InputWithHistory
               id="memory-repo"
+              historyKey="memory-target-repo"
               placeholder="owner/repo (e.g. jeremyeder/continuous-learning-example)"
               value={newMemory.repo}
               onChange={(e) =>
