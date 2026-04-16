@@ -34,6 +34,9 @@ import (
 // Set by the websocket package at init to avoid circular imports.
 var LoadEventsForExtraction func(sessionName string) []map[string]interface{}
 
+// slugRegex is compiled once for use in slugify().
+var slugRegex = regexp.MustCompile(`[^a-z0-9]+`)
+
 // ─── Extraction status constants ────────────────────────────────────
 
 const (
@@ -307,8 +310,7 @@ func rankAndCap(candidates []InsightCandidate, maxCount int) []InsightCandidate 
 // slugify converts a title into a URL-safe slug.
 func slugify(title string) string {
 	s := strings.ToLower(title)
-	reg := regexp.MustCompile(`[^a-z0-9]+`)
-	s = reg.ReplaceAllString(s, "-")
+	s = slugRegex.ReplaceAllString(s, "-")
 	s = strings.Trim(s, "-")
 	if len(s) > 60 {
 		s = s[:60]
@@ -607,7 +609,7 @@ func TriggerExtractionAsync(projectName, sessionName string) {
 
 func runExtraction(projectName, sessionName string) error {
 	// 1. Check feature flag
-	if !FeatureEnabled("learning-agent-loop") {
+	if !FeatureEnabled(correctionsFeatureFlag) {
 		log.Printf("Extraction: learning-agent-loop flag disabled, skipping %s/%s", projectName, sessionName)
 		return nil
 	}

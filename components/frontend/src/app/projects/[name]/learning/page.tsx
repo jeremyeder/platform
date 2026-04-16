@@ -22,14 +22,7 @@ import {
 } from "@/services/queries/use-learning";
 import { useWorkspaceFlag } from "@/services/queries/use-feature-flags-admin";
 import type { TimelineEntry } from "@/types/learning";
-
-/** Correction type labels for display. */
-const CORRECTION_TYPE_LABELS: Record<string, string> = {
-  incomplete: "Incomplete",
-  incorrect: "Incorrect",
-  out_of_scope: "Out of Scope",
-  style: "Style",
-};
+import { CORRECTION_TYPE_LABELS } from "@/services/api/corrections";
 
 /** Colors for correction type breakdown bars. */
 const CORRECTION_TYPE_COLORS: Record<string, string> = {

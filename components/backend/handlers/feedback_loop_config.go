@@ -181,7 +181,7 @@ func appendFeedbackLoopHistory(ctx context.Context, namespace string, entry Feed
 
 // GetFeedbackLoopConfig handles GET /api/projects/:projectName/feedback-loop/config
 func GetFeedbackLoopConfig(c *gin.Context) {
-	namespace := c.Param("projectName")
+	namespace := sanitizeParam(c.Param("projectName"))
 
 	reqK8s, _ := GetK8sClientsForRequest(c)
 	if reqK8s == nil {
@@ -202,7 +202,7 @@ func GetFeedbackLoopConfig(c *gin.Context) {
 
 // PutFeedbackLoopConfig handles PUT /api/projects/:projectName/feedback-loop/config
 func PutFeedbackLoopConfig(c *gin.Context) {
-	namespace := c.Param("projectName")
+	namespace := sanitizeParam(c.Param("projectName"))
 
 	reqK8s, _ := GetK8sClientsForRequest(c)
 	if reqK8s == nil {
@@ -250,7 +250,7 @@ func PutFeedbackLoopConfig(c *gin.Context) {
 
 // GetFeedbackLoopHistory handles GET /api/projects/:projectName/feedback-loop/history
 func GetFeedbackLoopHistory(c *gin.Context) {
-	namespace := c.Param("projectName")
+	namespace := sanitizeParam(c.Param("projectName"))
 
 	reqK8s, _ := GetK8sClientsForRequest(c)
 	if reqK8s == nil {

@@ -162,9 +162,9 @@ func fetchLearnedFiles(c *gin.Context, owner, repo, ref, token string) ([]Learne
 			}
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusNotFound {
+			resp.Body.Close()
 			if dirPath == "docs/learned" {
 				return nil, fmt.Errorf("404 Not Found")
 			}
@@ -173,15 +173,19 @@ func fetchLearnedFiles(c *gin.Context, owner, repo, ref, token string) ([]Learne
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			if dirPath == "docs/learned" {
 				b, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				return nil, fmt.Errorf("GitHub API error %d: %s", resp.StatusCode, string(b))
 			}
+			resp.Body.Close()
 			continue
 		}
 
 		var decoded interface{}
 		if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+			resp.Body.Close()
 			continue
 		}
+		resp.Body.Close()
 		mdPaths = append(mdPaths, collectMDPaths(decoded)...)
 	}
 
@@ -204,16 +208,18 @@ func fetchLearnedFiles(c *gin.Context, owner, repo, ref, token string) ([]Learne
 			log.Printf("Failed to fetch learned file %s: %v", filePath, fileErr)
 			continue
 		}
-		defer fileResp.Body.Close()
 
 		if fileResp.StatusCode != http.StatusOK {
+			fileResp.Body.Close()
 			continue
 		}
 
 		var fileObj map[string]interface{}
 		if json.NewDecoder(fileResp.Body).Decode(&fileObj) != nil {
+			fileResp.Body.Close()
 			continue
 		}
+		fileResp.Body.Close()
 
 		rawContent, _ := fileObj["content"].(string)
 		encoding, _ := fileObj["encoding"].(string)

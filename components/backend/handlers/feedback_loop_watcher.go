@@ -12,14 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// feedbackLoopFeatureFlag is the Unleash flag that gates the event-driven
-// feedback loop. When disabled, NotifyCorrection is a no-op.
-const feedbackLoopFeatureFlag = "learning-agent-loop"
-
 // IsFeedbackLoopEnabled is a package-level var so tests can override the
 // feature flag check. In production it delegates to FeatureEnabled().
+// Uses correctionsFeatureFlag (defined in corrections.go) — all learning
+// agent loop features share one flag.
 var IsFeedbackLoopEnabled = func() bool {
-	return FeatureEnabled(feedbackLoopFeatureFlag)
+	return FeatureEnabled(correctionsFeatureFlag)
 }
 
 // CorrectionNotification is the payload passed to the watcher when a correction

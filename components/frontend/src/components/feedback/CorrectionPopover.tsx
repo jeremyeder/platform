@@ -27,14 +27,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useFeedbackContextOptional } from "@/contexts/FeedbackContext";
 import type { CorrectionType } from "@/services/api/corrections";
-import { submitCorrection } from "@/services/api/corrections";
-
-const CORRECTION_TYPE_LABELS: Record<CorrectionType, string> = {
-  incomplete: "Incomplete",
-  incorrect: "Incorrect",
-  out_of_scope: "Out of scope",
-  style: "Style",
-};
+import { submitCorrection, CORRECTION_TYPE_LABELS } from "@/services/api/corrections";
 
 const MIN_CORRECTION_LENGTH = 10;
 const MAX_CORRECTION_LENGTH = 2000;
@@ -89,7 +82,7 @@ export function CorrectionPopover({
         session_name: feedbackContext.sessionName,
         message_id: messageId,
         message_content: includeContent ? messageContent : undefined,
-        source: "user",
+        source: "ui",
       });
 
       setSubmittedCount((prev) => prev + 1);
