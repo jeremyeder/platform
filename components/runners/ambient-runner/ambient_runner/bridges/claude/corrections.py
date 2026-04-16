@@ -225,6 +225,7 @@ def create_correction_mcp_tool(
     session_id: str,
     sdk_tool_decorator,
     has_rubric: bool = False,
+    ledger=None,
 ):
     """Create the log_correction MCP tool.
 
@@ -235,12 +236,15 @@ def create_correction_mcp_tool(
         has_rubric: Whether a rubric evaluation tool is also available.
             When True the tool description is extended to instruct the
             agent to log corrections after rubric evaluations.
+        ledger: Optional CorrectionLedger to append corrections to
+            (independent of Langfuse).
 
     Returns:
         Decorated async tool function.
     """
     _obs = obs
     _session_id = session_id
+    _ledger = ledger
 
     context = _get_session_context()
     _target_map = build_target_map(context)
@@ -281,6 +285,18 @@ def create_correction_mcp_tool(
             session_id=_session_id,
             source=source,
         )
+
+        # Append to in-memory ledger (independent of Langfuse success).
+        # The ledger feeds correction context back into the agent's prompt
+        # on subsequent turns.
+        if _ledger is not None:
+            _ledger.append(
+                {
+                    "correction_type": correction_type,
+                    "agent_action": agent_action,
+                    "user_correction": user_correction,
+                }
+            )
 
         if success:
             return {
