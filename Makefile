@@ -940,6 +940,36 @@ test-e2e-setup: ## Install e2e test dependencies
 
 e2e-setup: test-e2e-setup ## Alias for test-e2e-setup (backward compatibility)
 
+##@ Documentation Screenshots
+
+screenshots: ## Capture documentation screenshots against running kind cluster
+	@echo "$(COLOR_BLUE)▶$(COLOR_RESET) Capturing documentation screenshots..."
+	@if [ ! -f e2e/.env.test ] && [ -z "$(CYPRESS_BASE_URL)" ]; then \
+		echo "$(COLOR_RED)✗$(COLOR_RESET) No cluster config. Run 'make kind-up' first."; \
+		exit 1; \
+	fi
+	cd e2e && \
+		CYPRESS_SCREENSHOT_MODE=true \
+		CYPRESS_TEST_TOKEN="$$(grep TEST_TOKEN .env.test 2>/dev/null | cut -d= -f2)" \
+		CYPRESS_BASE_URL="$$(grep CYPRESS_BASE_URL .env.test 2>/dev/null | cut -d= -f2)" \
+		CYPRESS_ANTHROPIC_API_KEY=mock-replay-key \
+		npx cypress run --browser chrome --spec cypress/e2e/screenshots.cy.ts
+	@mkdir -p docs/public/images/screenshots
+	@cp e2e/cypress/screenshots/output/*.png docs/public/images/screenshots/
+	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Screenshots updated in docs/public/images/screenshots/"
+
+screenshots-headed: ## Open Cypress for screenshot debugging
+	cd e2e && \
+		CYPRESS_SCREENSHOT_MODE=true \
+		CYPRESS_TEST_TOKEN="$$(grep TEST_TOKEN .env.test 2>/dev/null | cut -d= -f2)" \
+		CYPRESS_BASE_URL="$$(grep CYPRESS_BASE_URL .env.test 2>/dev/null | cut -d= -f2)" \
+		CYPRESS_ANTHROPIC_API_KEY=mock-replay-key \
+		npx cypress open --e2e --browser chrome
+
+screenshots-clean: ## Remove generated screenshots
+	@rm -rf e2e/cypress/screenshots/output/
+	@echo "$(COLOR_GREEN)✓$(COLOR_RESET) Screenshot output cleaned"
+
 kind-rebuild: check-kind check-kubectl check-local-context build-all ## Rebuild, reload, and restart all components in kind
 	@$(if $(filter podman,$(CONTAINER_ENGINE)),KIND_EXPERIMENTAL_PROVIDER=podman) kind get clusters 2>/dev/null | grep -q '^$(KIND_CLUSTER_NAME)$$' || \
 		(echo "$(COLOR_RED)✗$(COLOR_RESET) Kind cluster '$(KIND_CLUSTER_NAME)' not found. Run 'make kind-up LOCAL_IMAGES=true' first." && exit 1)

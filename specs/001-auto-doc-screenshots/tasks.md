@@ -17,8 +17,8 @@
 
 **Purpose**: Create directories and config scaffolding
 
-- [ ] T001 Create screenshots directory `docs/public/images/screenshots/.gitkeep`
-- [ ] T002 [P] Add `cypress/screenshots/output/` to `e2e/.gitignore`
+- [x] T001 Create screenshots directory `docs/public/images/screenshots/.gitkeep`
+- [x] T002 [P] Add `cypress/screenshots/output/` to `e2e/.gitignore`
 
 ---
 
@@ -26,13 +26,13 @@
 
 **Purpose**: CSS and Cypress infrastructure that all stories depend on
 
-- [ ] T003 Add screenshot theme-switching CSS rules to `docs/src/styles/custom.css`
-- [ ] T004 [P] Create screenshot manifest at `e2e/cypress/screenshots/manifest.json` with all 10 entries
-- [ ] T005 Create Cypress screenshot spec at `e2e/cypress/e2e/screenshots.cy.ts` with manifest-driven capture, theme toggling, workspace/session setup, and setup step handlers
-- [ ] T006 [P] Add `screenshotsFolder` and DPI normalization (`CYPRESS_SCREENSHOT_MODE`) to `e2e/cypress.config.ts`
-- [ ] T007 Add `screenshots`, `screenshots-headed`, `screenshots-clean` targets to `Makefile`
-- [ ] T007a Create Netlify config at `docs/netlify.toml` with build command (`npm ci && npx playwright install chromium && npm run build`), `/platform/*` redirect
-- [ ] T007b Update `docs/astro.config.mjs` for environment-aware `site`/`base` using `process.env.NETLIFY`
+- [x] T003 Add screenshot theme-switching CSS rules to `docs/src/styles/custom.css`
+- [x] T004 [P] Create screenshot manifest at `e2e/cypress/screenshots/manifest.json` with all 10 entries
+- [x] T005 Create Cypress screenshot spec at `e2e/cypress/e2e/screenshots.cy.ts` with manifest-driven capture, theme toggling, workspace/session setup, and setup step handlers
+- [x] T006 [P] Add `screenshotsFolder` and DPI normalization (`CYPRESS_SCREENSHOT_MODE`) to `e2e/cypress.config.ts`
+- [x] T007 Add `screenshots`, `screenshots-headed`, `screenshots-clean` targets to `Makefile`
+- [x] T007a Create Netlify config at `docs/netlify.toml` with build command (`npm ci && npx playwright install chromium && npm run build`), `/platform/*` redirect
+- [x] T007b Update `docs/astro.config.mjs` for environment-aware `site`/`base` using `process.env.NETLIFY`
 
 **Checkpoint**: `make screenshots` can run against a kind cluster; Netlify site renders with correct CSS
 
