@@ -9,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,6 +25,8 @@ import { useRunnerTypes } from "@/services/queries/use-runner-types";
 import { useModels } from "@/services/queries/use-models";
 import { DEFAULT_RUNNER_TYPE_ID } from "@/services/api/runner-types";
 import type { WorkflowConfig } from "../lib/types";
+
+const MENU_VERSION = "2026-04-16";
 
 type PendingRepo = {
   url: string;
@@ -54,6 +57,28 @@ export function NewSessionView({
   isSubmitting = false,
 }: NewSessionViewProps) {
   const { data: runnerTypes } = useRunnerTypes(projectName);
+
+  const [showMenuDot, setShowMenuDot] = useState(false);
+
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem("acp-menu-seen-version");
+      if (seen !== MENU_VERSION) setShowMenuDot(true);
+    } catch {
+      // localStorage unavailable (private browsing) — no dot
+    }
+  }, []);
+
+  const handleMenuOpenChange = useCallback((open: boolean) => {
+    if (open && showMenuDot) {
+      setShowMenuDot(false);
+      try {
+        localStorage.setItem("acp-menu-seen-version", MENU_VERSION);
+      } catch {
+        // localStorage unavailable
+      }
+    }
+  }, [showMenuDot]);
 
   const [prompt, setPrompt] = useState("");
   const [selectedRunner, setSelectedRunner] = useState<string>(DEFAULT_RUNNER_TYPE_ID);
@@ -177,10 +202,13 @@ export function NewSessionView({
           />
           <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-2">
             <div className="flex items-center gap-1">
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={handleMenuOpenChange}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <Button variant="ghost" size="sm" className="relative h-7 w-7 p-0">
                     <Plus className="h-4 w-4" />
+                    {showMenuDot && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top">
@@ -192,6 +220,7 @@ export function NewSessionView({
                     <Upload className="w-4 h-4 mr-2" />
                     Upload File
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                 </DropdownMenuContent>
               </DropdownMenu>
               <RunnerModelSelector
