@@ -1,0 +1,51 @@
+name: Claude SDK Options Drift Check
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC
+  workflow_dispatch:
+
+concurrency:
+  group: claude-sdk-options-drift
+  cancel-in-progress: true
+
+jobs:
+  check-drift:
+    name: Check SDK Options Drift
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install SDK
+        run: pip install claude-agent-sdk
+      - name: Check for drift
+        id: drift
+        run: |
+          EXIT_CODE=0
+          python scripts/sdk-options-drift-check.py || EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::error::Drift check encountered an error"
+            exit 1
+          fi
+      - name: Create PR if drift detected
+        if: steps.drift.outputs.exit_code == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="auto/sdk-options-drift-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add components/runners/ambient-runner/sdk-options-manifest.json
+          git commit -m "chore: update SDK options manifest for drift"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: SDK options manifest drift detected" \
+            --body "Weekly drift check found changes in ClaudeAgentOptions fields. Review and update allowlist/UI as needed." \
+            --label "amber:auto-fix"
