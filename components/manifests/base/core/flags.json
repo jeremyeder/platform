@@ -39,6 +39,16 @@
           "value": "workspace"
         }
       ]
+    },
+    {
+      "name": "learning-agent-loop",
+      "description": "Enable the learning agent feedback loop (corrections pipeline, memory store, correction injection)",
+      "tags": [
+        {
+          "type": "scope",
+          "value": "workspace"
+        }
+      ]
     }
   ]
 }
