@@ -133,11 +133,26 @@ jobs:
           uv lock
           echo "uv.lock regenerated"
 
+      - name: Check for SDK options drift
+        if: steps.check.outputs.needs_update == 'true' && steps.existing_pr.outputs.pr_exists == 'false'
+        id: drift
+        run: |
+          pip install claude-agent-sdk 2>/dev/null
+          EXIT_CODE=0
+          python scripts/sdk-options-drift-check.py || EXIT_CODE=$?
+          echo "drift_exit=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::warning::SDK options drift check encountered an error"
+          elif [ "$EXIT_CODE" -eq 1 ]; then
+            echo "SDK options drift detected — manifest updated"
+          fi
+
       - name: Create branch, commit, and open PR
         if: steps.check.outputs.needs_update == 'true' && steps.existing_pr.outputs.pr_exists == 'false'
         env:
           LATEST: ${{ steps.pypi.outputs.latest }}
           CURRENT: ${{ steps.current.outputs.current }}
+          DRIFT_EXIT: ${{ steps.drift.outputs.drift_exit }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="auto/update-claude-agent-sdk"
@@ -151,6 +166,12 @@ jobs:
           git checkout -b "$BRANCH"
           git add components/runners/claude-code-runner/pyproject.toml \
                   components/runners/claude-code-runner/uv.lock
+
+          # Include manifest if drift was detected
+          if [ -n "$(git diff -- components/runners/ambient-runner/sdk-options-manifest.json)" ]; then
+            git add components/runners/ambient-runner/sdk-options-manifest.json
+          fi
+
           git commit -m "chore(runner): update claude-agent-sdk >=${CURRENT} to >=${LATEST}
 
           Automated daily update of the Claude Agent SDK minimum version.
@@ -159,11 +180,17 @@ jobs:
 
           git push -u origin "$BRANCH"
 
+          DRIFT_NOTE=""
+          if [ "$DRIFT_EXIT" = "1" ]; then
+            DRIFT_NOTE="- **SDK options drift detected** — \`sdk-options-manifest.json\` updated. Review allowlist and UI for new/removed fields."
+          fi
+
           printf '%s\n' \
             "## Summary" \
             "" \
             "- Updates \`claude-agent-sdk\` minimum version from \`>=${CURRENT}\` to \`>=${LATEST}\`" \
             "- Files changed: \`pyproject.toml\` and \`uv.lock\`" \
+            "${DRIFT_NOTE:+$DRIFT_NOTE}" \
             "" \
             "## Release Info" \
             "" \
