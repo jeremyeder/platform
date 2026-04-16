@@ -109,6 +109,22 @@ def build_mcp_servers(
         mcp_servers["corrections"] = correction_server
         logger.info("Added corrections feedback MCP tool (log_correction)")
 
+    # Memory suggestion tool (learning agent loop)
+    from ambient_runner.bridges.claude.memory import create_suggest_memory_tool
+
+    session_name = os.getenv("AGENTIC_SESSION_NAME", "").strip() or context.session_id
+    memory_tool = create_suggest_memory_tool(
+        sdk_tool_decorator=sdk_tool,
+        cwd_path=cwd_path,
+        session_name=session_name,
+    )
+    if memory_tool:
+        memory_server = create_sdk_mcp_server(
+            name="memory", version="1.0.0", tools=[memory_tool]
+        )
+        mcp_servers["memory"] = memory_server
+        logger.info("Added memory suggestion MCP tool (suggest_memory)")
+
     # Backend API tools (session management)
     backend_tools = create_backend_mcp_tools(sdk_tool_decorator=sdk_tool)
     if backend_tools:
