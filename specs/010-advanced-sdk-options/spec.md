@@ -91,7 +91,7 @@ The Claude Agent SDK evolves. The platform must detect when `ClaudeAgentOptions`
 **Runner:**
 
 - **FR-004**: Runner parses `SDK_OPTIONS` env var as JSON on adapter init. Malformed input → warn + use defaults.
-- **FR-005**: Runner applies a denylist for platform-internal keys (`cwd`, `api_key`, `mcp_servers`, `setting_sources`, `stderr`, `resume`, `continue_conversation`, `add_dirs`). Logs a warning per blocked key.
+- **FR-005**: Runner applies a denylist for platform-internal keys (`cwd`, `api_key`, `mcp_servers`, `setting_sources`, `stderr`, `resume`, `continue_conversation`, `add_dirs`, `cli_path`, `env`). Logs a warning per blocked key.
 - **FR-006**: `system_prompt` is appended under `## Custom Instructions`, not replaced.
 
 **Frontend:**

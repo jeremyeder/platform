@@ -62,10 +62,10 @@
 
 - [ ] T040 [US2] Generate `components/runners/ambient-runner/sdk-options-manifest.json` by introspecting the current `claude-agent-sdk` package: install via `uv pip install claude-agent-sdk`, extract fields from `ClaudeAgentOptions.model_fields` (Pydantic), write `{"generatedFrom": "claude-agent-sdk", "generatedAt": "<ISO>", "sdkVersion": "<version>", "options": {"field_name": {"type": "<annotation>", "required": <bool>}}}`
 - [ ] T041 [US2] Create `scripts/sdk-options-drift-check.py`: import `ClaudeAgentOptions`, introspect via `model_fields`, compare against manifest, exit 0 (no drift), exit 1 (drift found — write updated manifest), exit 2 (error). Must handle: `ImportError` (hard fail), Pydantic v1 vs v2 (check for `model_fields` vs `__fields__`)
-- [ ] T042 [US2] Create `.github/workflows/claude-sdk-options-drift.yml`: weekly cron `0 6 * * 1` + `workflow_dispatch`. Steps: checkout, setup Python 3.12, `pip install claude-agent-sdk`, run drift script, if exit 1: create branch `auto/sdk-options-drift-<date>`, commit updated manifest, open PR with `amber:auto-fix` label. If exit 2: fail the workflow loudly.
+- [ ] T042 [US2] Add drift check step to `.github/workflows/sdk-version-bump.yml`: after "Apply updates" step, `pip install claude-agent-sdk`, run `scripts/sdk-options-drift-check.py`, include updated manifest in the commit if drift found. No standalone workflow — drift detection runs as part of the daily SDK version bump.
 - [ ] T043 [US2] Test drift detection end-to-end: run `python scripts/sdk-options-drift-check.py` locally, verify clean exit with current manifest
 
-### Commit: `feat(ci): add weekly Claude SDK options drift detection workflow`
+### Commit: `refactor(ci): consolidate drift detection into sdk-version-bump workflow`
 
 ---
 
