@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BACKEND_URL } from "@/lib/config";
 import { buildForwardHeadersAsync } from "@/lib/auth";
+import { parseOwnerRepo } from "@/lib/github-utils";
 
 /**
  * POST /api/projects/:name/learned/create
  *
- * Creates a new memory by opening a PR in the workspace repo.
+ * Creates a new memory by opening a draft PR in the target repo.
+ * Proxies to backend POST /projects/:name/learned/create.
  */
 export async function POST(
   request: NextRequest,
@@ -38,29 +40,29 @@ export async function POST(
     }
 
     // Resolve repo: use explicit repo from request, fall back to project annotation
-    let repoAnnotation = repo || "";
-    if (!repoAnnotation) {
+    let repoStr = repo || "";
+    if (!repoStr) {
       const projectRes = await fetch(
         `${BACKEND_URL}/projects/${projectName}`,
         { method: "GET", headers }
       );
       if (projectRes.ok) {
         const project = await projectRes.json();
-        repoAnnotation =
+        repoStr =
           project?.data?.annotations?.["ambient.ai/repo"] ||
           project?.annotations?.["ambient.ai/repo"] ||
           "";
       }
     }
 
-    if (!repoAnnotation) {
+    if (!repoStr) {
       return NextResponse.json(
         { error: "No repository specified. Enter a target repository (owner/repo)." },
         { status: 400 }
       );
     }
 
-    const ownerRepo = parseOwnerRepo(repoAnnotation);
+    const ownerRepo = parseOwnerRepo(repoStr);
     if (!ownerRepo) {
       return NextResponse.json(
         { error: "Invalid repository format. Use owner/repo (e.g. jeremyeder/continuous-learning-example)" },
@@ -68,49 +70,31 @@ export async function POST(
       );
     }
 
-    const date = new Date().toISOString().split("T")[0];
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .slice(0, 60);
-    const branchName = `learned/${type}-${date}-${slug}`;
-
-    const prData = {
-      owner: ownerRepo.owner,
-      repo: ownerRepo.repo,
-      title: `learned: ${title}`,
-      body: `## New Memory\n\n**Type:** ${type}\n**Source:** Manual entry\n\n---\n\n${content}`,
-      head: branchName,
-      base: "main",
-      draft: false,
-    };
-
-    const prRes = await fetch(
-      `${BACKEND_URL}/projects/${projectName}/github/pr`,
+    const res = await fetch(
+      `${BACKEND_URL}/projects/${projectName}/learned/create`,
       {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify(prData),
+        body: JSON.stringify({
+          owner: ownerRepo.owner,
+          repo: ownerRepo.repo,
+          title,
+          content,
+          type,
+        }),
       }
     );
 
-    if (!prRes.ok) {
-      const errText = await prRes.text();
+    if (!res.ok) {
+      const errBody = await res.text();
       return NextResponse.json(
-        { error: `Failed to create PR: ${errText}` },
-        { status: 500 }
+        { error: errBody },
+        { status: res.status }
       );
     }
 
-    const prResult = await prRes.json();
-    const resultData = prResult?.data || prResult;
-
-    return NextResponse.json({
-      prUrl: resultData.url || "",
-      prNumber: resultData.number || 0,
-    });
+    const result = await res.json();
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to create memory:", error);
     return NextResponse.json(
@@ -119,5 +103,3 @@ export async function POST(
     );
   }
 }
-
-import { parseOwnerRepo } from "@/lib/github-utils";

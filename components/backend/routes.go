@@ -132,8 +132,9 @@ func registerRoutes(r *gin.Engine) {
 			projectGroup.POST("/feature-flags/:flagName/enable", handlers.EnableFeatureFlag)
 			projectGroup.POST("/feature-flags/:flagName/disable", handlers.DisableFeatureFlag)
 
-			// Learned files endpoint (project memory store)
+			// Learned files endpoints (project memory store)
 			projectGroup.GET("/learned", handlers.ListLearnedEntries)
+			projectGroup.POST("/learned/create", handlers.CreateLearnedPR)
 
 			// Corrections pipeline endpoints (gated by learning-agent-loop feature flag)
 			projectGroup.POST("/corrections", handlers.PostCorrection)

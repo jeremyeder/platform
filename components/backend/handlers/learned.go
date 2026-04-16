@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"ambient-code-backend/types"
 
@@ -261,6 +263,175 @@ func fetchLearnedFiles(c *gin.Context, owner, repo, ref, token string) ([]Learne
 	}
 
 	return entries, nil
+}
+
+// CreateLearnedPR handles POST /api/projects/:projectName/learned/create
+//
+// Creates a learned file on a new branch and opens a draft PR.
+// Body: {"owner":"...","repo":"...","title":"...","content":"...","type":"correction|pattern"}
+func CreateLearnedPR(c *gin.Context) {
+	project := c.Param("projectName")
+
+	var req struct {
+		Owner   string `json:"owner" binding:"required"`
+		Repo    string `json:"repo" binding:"required"`
+		Title   string `json:"title" binding:"required"`
+		Content string `json:"content" binding:"required"`
+		Type    string `json:"type" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Type != "correction" && req.Type != "pattern" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "type must be 'correction' or 'pattern'"})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	reqK8s, reqDyn := GetK8sClientsForRequest(c)
+	if reqK8s == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or missing token"})
+		return
+	}
+	if userID == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing user context"})
+		return
+	}
+
+	repoURL := fmt.Sprintf("https://github.com/%s/%s", req.Owner, req.Repo)
+	token, err := GetGitHubTokenRepo(c.Request.Context(), reqK8s, reqDyn, project, userID.(string))
+	if err != nil {
+		log.Printf("Failed to get GitHub token for learned PR, project %s: %v", project, err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "GitHub authentication failed. Configure GitHub integration in Workspace Settings."})
+		return
+	}
+	_ = repoURL
+
+	api := "https://api.github.com"
+	auth := "Bearer " + token
+
+	// 1. Get default branch SHA
+	refResp, err := doGitHubRequest(c.Request.Context(), "GET",
+		fmt.Sprintf("%s/repos/%s/%s/git/ref/heads/main", api, req.Owner, req.Repo),
+		auth, "", nil)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to get default branch: %v", err)})
+		return
+	}
+	defer refResp.Body.Close()
+	if refResp.StatusCode != 200 {
+		body, _ := io.ReadAll(refResp.Body)
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to get default branch (%d): %s", refResp.StatusCode, string(body))})
+		return
+	}
+	var refData struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	json.NewDecoder(refResp.Body).Decode(&refData)
+	baseSHA := refData.Object.SHA
+
+	// 2. Create branch
+	date := time.Now().Format("2006-01-02")
+	slug := slugRegex.ReplaceAllString(strings.ToLower(req.Title), "-")
+	slug = strings.Trim(slug, "-")
+	if len(slug) > 60 {
+		slug = slug[:60]
+	}
+	if slug == "" {
+		slug = "memory"
+	}
+	branchName := fmt.Sprintf("learned/%s-%s-%s", req.Type, date, slug)
+
+	branchBody, _ := json.Marshal(map[string]interface{}{
+		"ref": "refs/heads/" + branchName,
+		"sha": baseSHA,
+	})
+	branchResp, err := doGitHubRequest(c.Request.Context(), "POST",
+		fmt.Sprintf("%s/repos/%s/%s/git/refs", api, req.Owner, req.Repo),
+		auth, "", bytes.NewReader(branchBody))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create branch: %v", err)})
+		return
+	}
+	defer branchResp.Body.Close()
+	if branchResp.StatusCode != 201 {
+		body, _ := io.ReadAll(branchResp.Body)
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create branch (%d): %s", branchResp.StatusCode, string(body))})
+		return
+	}
+
+	// 3. Create file on branch
+	filePath := fmt.Sprintf("docs/learned/%ss/%s-%s.md", req.Type, date, slug)
+	now := time.Now().UTC().Format(time.RFC3339)
+	author := userID.(string)
+	fileContent := fmt.Sprintf("---\ntype: %s\ndate: %s\nauthor: %s\ntitle: \"%s\"\n---\n\n%s\n",
+		req.Type, now, author, req.Title, req.Content)
+
+	fileBody, _ := json.Marshal(map[string]interface{}{
+		"message": fmt.Sprintf("learned: %s", req.Title),
+		"content": base64.StdEncoding.EncodeToString([]byte(fileContent)),
+		"branch":  branchName,
+	})
+	fileResp, err := doGitHubRequest(c.Request.Context(), "PUT",
+		fmt.Sprintf("%s/repos/%s/%s/contents/%s", api, req.Owner, req.Repo, filePath),
+		auth, "", bytes.NewReader(fileBody))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create file: %v", err)})
+		return
+	}
+	defer fileResp.Body.Close()
+	if fileResp.StatusCode != 201 {
+		body, _ := io.ReadAll(fileResp.Body)
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create file (%d): %s", fileResp.StatusCode, string(body))})
+		return
+	}
+
+	// 4. Create draft PR
+	prBody, _ := json.Marshal(map[string]interface{}{
+		"title": fmt.Sprintf("learned: %s", req.Title),
+		"body":  fmt.Sprintf("## New Memory\n\n**Type:** %s\n**Source:** Manual entry\n\n---\n\n%s", req.Type, req.Content),
+		"head":  branchName,
+		"base":  "main",
+		"draft": true,
+	})
+	prResp, err := doGitHubRequest(c.Request.Context(), "POST",
+		fmt.Sprintf("%s/repos/%s/%s/pulls", api, req.Owner, req.Repo),
+		auth, "", bytes.NewReader(prBody))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create PR: %v", err)})
+		return
+	}
+	defer prResp.Body.Close()
+	prRespBody, _ := io.ReadAll(prResp.Body)
+	if prResp.StatusCode != 201 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create PR (%d): %s", prResp.StatusCode, string(prRespBody))})
+		return
+	}
+
+	var prResult struct {
+		HTMLURL string `json:"html_url"`
+		Number  int    `json:"number"`
+	}
+	json.Unmarshal(prRespBody, &prResult)
+
+	// 5. Add continuous-learning label (best-effort)
+	labelBody, _ := json.Marshal(map[string]interface{}{
+		"labels": []string{"continuous-learning"},
+	})
+	labelResp, _ := doGitHubRequest(c.Request.Context(), "POST",
+		fmt.Sprintf("%s/repos/%s/%s/issues/%d/labels", api, req.Owner, req.Repo, prResult.Number),
+		auth, "", bytes.NewReader(labelBody))
+	if labelResp != nil {
+		labelResp.Body.Close()
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"prUrl":    prResult.HTMLURL,
+		"prNumber": prResult.Number,
+	})
 }
 
 // collectMDPaths extracts .md file paths from a GitHub API directory listing.
