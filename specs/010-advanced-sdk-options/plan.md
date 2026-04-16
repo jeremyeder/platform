@@ -73,14 +73,16 @@ components/frontend/src/components/__tests__/
 
 ## Design Decisions
 
-1. **Single file for frontend component** — `advanced-sdk-options.tsx` is a self-contained collapsible panel. No sub-component directory needed. Fields are simple inputs, selects, switches, and textareas.
+1. **Reuse existing form components** — `claude-agent-options/` already exists on main with schema, options-form, and 11 field editors covering all SDK fields. `advanced-sdk-options.tsx` is a thin collapsible wrapper around `AgentOptionsFields`.
 
-2. **Backend allowlist as map literal** — `allowedSdkOptionKeys map[string]bool` at package level. Simple, auditable, no external config.
+2. **Backend allowlist as map literal** — `allowedSdkOptionKeys map[string]bool` at package level. Keys derived from `claudeAgentOptionsSchema` minus platform-internal keys. Backend does key filtering only — JSON marshal handles type serialization.
 
-3. **Runner denylist as frozenset** — `_SDK_OPTIONS_DENYLIST` at module level. Blocks platform-internal keys even if backend is compromised.
+3. **Runner denylist as frozenset** — `_SDK_OPTIONS_DENYLIST` at module level. Blocks platform-internal keys (`cwd`, `api_key`, `mcp_servers`, `setting_sources`, `stderr`, `resume`, `continue_conversation`, `add_dirs`) even if backend is bypassed.
 
 4. **SDK_OPTIONS as JSON string in env var** — Avoids CRD changes. The `environmentVariables` map already exists on the CR spec.
 
 5. **System prompt append-only** — User text appended under `## Custom Instructions` heading. Prevents users from stripping platform security instructions.
 
 6. **Feature flag UI-only** — Backend always accepts `sdkOptions` for API callers. Flag gates the form in the frontend only.
+
+7. **Rename agentOptions → sdkOptions** — Frontend types already have `agentOptions?: Record<string, unknown>` on the request type. Rename to `sdkOptions` for clarity (matches SDK wire format).

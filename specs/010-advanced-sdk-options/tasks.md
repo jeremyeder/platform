@@ -3,102 +3,94 @@
 **Input**: Design documents from `/specs/010-advanced-sdk-options/`
 **Prerequisites**: plan.md (required), spec.md (required)
 
+**Execution skill**: `superpowers:subagent-driven-development` (one subagent per phase, review between phases)
+
 ## Phase 1: Setup
 
-- [ ] T001 [P1] Add `advanced-sdk-options` feature flag to `components/manifests/base/core/flags.json` with `scope:workspace` tag and description "Expose Claude Agent SDK options in session creation UI"
-- [ ] T002 [P1] Verify flag syncs: run `make lint` to confirm `flags.json` is valid JSON and passes check-yaml
+- [ ] T001 Add `advanced-sdk-options` feature flag to `components/manifests/base/core/flags.json` with `scope:workspace` tag
 
-## Phase 2: Backend
+### Commit: `feat(flags): add advanced-sdk-options workspace feature flag`
 
-### Types
+---
 
-- [ ] T010 [P1] [US1] Add `SdkOptions map[string]interface{}` field with `json:"sdkOptions,omitempty"` to `CreateAgenticSessionRequest` in `components/backend/types/session.go`
+## Phase 2: Backend — SDK Options Filtering (TDD)
 
-### Allowlist + Validation (TDD)
+**Goal**: Backend accepts `sdkOptions` on session create, filters through allowlist, validates types, serializes to `SDK_OPTIONS` env var on the CR.
 
-- [ ] T011 [P1] [US1] Create test file `components/backend/handlers/sessions_sdk_options_test.go` with `//go:build test` tag. Write tests for `filterSdkOptions`: valid keys pass, unknown keys dropped silently, empty map returns nil
-- [ ] T012 [P1] [US1] Write tests for `validateSdkOptionValue`: `temperature` accepts float64, rejects string; `max_turns` accepts int, rejects float; `system_prompt` accepts string, rejects number; `allowed_tools` accepts []interface{}, rejects string
-- [ ] T013 [P1] [US1] Run tests, verify they fail (functions not yet implemented): `cd components/backend && go test -tags test -run TestSdkOptions ./handlers/`
-- [ ] T014 [P1] [US1] Implement `allowedSdkOptionKeys` map and `filterSdkOptions(opts map[string]interface{}) (map[string]interface{}, error)` in `components/backend/handlers/sessions.go`. Allowlist keys: `temperature`, `max_turns`, `max_budget_usd`, `effort`, `system_prompt`, `permission_mode`, `allowed_tools`, `disallowed_tools`, `thinking`, `max_buffer_size`, `include_partial_messages`, `enable_file_checkpointing`, `sandbox`, `output_format`, `betas`, `hooks`, `agents`, `plugins`, `tools`, `env`, `extra_args`, `user`
-- [ ] T015 [P1] [US1] Implement `validateSdkOptionValue(key string, value interface{}) error` in `components/backend/handlers/sessions.go`. Type-check each key: floats for `temperature`/`max_budget_usd`, int for `max_turns`/`max_buffer_size`, string for `system_prompt`/`permission_mode`/`effort`/`user`, bool for `include_partial_messages`/`enable_file_checkpointing`, slice for `allowed_tools`/`disallowed_tools`/`betas`/`plugins`, map for `thinking`/`sandbox`/`output_format`/`hooks`/`agents`/`env`/`extra_args`/`tools`
-- [ ] T016 [P1] [US1] Run tests, verify they pass: `cd components/backend && go test -tags test -run TestSdkOptions ./handlers/`
+- [ ] T010 [US1] Add `SdkOptions map[string]interface{}` field with `json:"sdkOptions,omitempty"` to `CreateAgenticSessionRequest` in `components/backend/types/session.go`
+- [ ] T011 [US1] Create `components/backend/handlers/sessions_sdk_options_test.go` (TDD — tests first, then implement). Tests: valid keys pass through, unknown keys silently dropped, empty map returns nil, string/numeric/bool/slice type checks, invalid type returns error
+- [ ] T012 [US1] Implement `allowedSdkOptionKeys` map and `filterSdkOptions` in `components/backend/handlers/sessions.go`. Allowlist keys: all fields from `claudeAgentOptionsSchema` minus denylisted keys (`cwd`, `resume`, `mcp_servers`, `setting_sources`, `continue_conversation`, `add_dirs`, `cli_path`, `settings`, `permission_prompt_tool_name`, `fork_session`). Include `validateSdkOptionValue` for basic type checks on primitives (string, float, int, bool, slice). Complex objects (hooks, agents, sandbox, thinking, mcp_servers) pass through as-is — JSON marshal handles them.
+- [ ] T013 [US1] Wire into `CreateAgenticSession` handler: if `req.SdkOptions` is non-empty, call `filterSdkOptions`, return 400 on error, JSON-serialize into `envVars["SDK_OPTIONS"]`
+- [ ] T014 [US1] Run backend tests: `cd components/backend && go test -tags test -run TestSdkOptions ./handlers/`
 
-### Handler Integration
+### Commit: `feat(backend): add sdkOptions allowlist and type validation`
 
-- [ ] T017 [P1] [US1] In `CreateAgenticSession` handler in `components/backend/handlers/sessions.go`, after `envVars` is populated: if `req.SdkOptions` is non-empty, call `filterSdkOptions`, return 400 on validation error, JSON-serialize the result into `envVars["SDK_OPTIONS"]`. Skip if filtered result is empty
-- [ ] T018 [P1] [US1] Write integration test in `components/backend/handlers/sessions_sdk_options_test.go`: POST create session with `sdkOptions: {"temperature": 0.3, "max_turns": 5}`, verify CR has `environmentVariables.SDK_OPTIONS` containing the JSON
-- [ ] T019 [P1] [US1] Write edge-case test: POST with `sdkOptions: {"temperature": "hot"}` returns HTTP 400
-- [ ] T020 [P1] [US1] Write edge-case test: POST with `sdkOptions: {"unknown_key": 42}` succeeds, CR `SDK_OPTIONS` does not contain `unknown_key`
-- [ ] T021 [P1] [US1] Write edge-case test: POST with `sdkOptions: {}` succeeds, CR has no `SDK_OPTIONS` key in env vars
-- [ ] T022 [P1] [US1] Run full backend tests: `cd components/backend && go test -tags test ./handlers/`
-- [ ] T023 [P1] [US1] Run backend linters: `cd components/backend && gofmt -l . && go vet ./...`
+---
 
-### Commit
+## Phase 3: Runner — SDK_OPTIONS Parsing (TDD)
 
-- [ ] T024 [P1] Commit Phase 2: "feat(backend): add sdkOptions allowlist and type validation for session creation"
+**Goal**: Runner parses `SDK_OPTIONS` env var, applies denylist, merges system_prompt append-only, passes remaining options to adapter.
 
-## Phase 3: User Story 1 -- Configure SDK Options (P1)
+- [ ] T020 [US1] Create `components/runners/ambient-runner/tests/test_sdk_options.py` (TDD). Tests: valid JSON parsed, malformed JSON returns empty dict, JSON array returns empty dict, denylisted keys blocked with warning, non-denylisted keys pass, system_prompt appended under `## Custom Instructions` heading
+- [ ] T021 [US1] Implement `_SDK_OPTIONS_DENYLIST` frozenset and SDK_OPTIONS parsing in `components/runners/ambient-runner/ambient_runner/bridges/claude/bridge.py`. In `_ensure_adapter`: parse env var, apply denylist with per-key warning logs, handle system_prompt append, merge remaining keys into options dict
+- [ ] T022 [US1] Run runner tests: `cd components/runners/ambient-runner && python -m pytest tests/test_sdk_options.py -v`
 
-### Runner: SDK_OPTIONS Parsing (TDD)
+### Commit: `feat(runner): parse SDK_OPTIONS env var with denylist and system prompt merge`
 
-- [ ] T030 [P1] [US1] Create test file `components/runners/ambient-runner/tests/test_sdk_options.py`. Write tests: parse valid JSON from `SDK_OPTIONS` env var, merge into adapter options dict; malformed JSON logs warning and returns empty dict; JSON array (not object) logs warning and returns empty dict
-- [ ] T031 [P1] [US1] Write denylist tests in `components/runners/ambient-runner/tests/test_sdk_options.py`: `cwd`, `api_key`, `mcp_servers`, `setting_sources`, `stderr`, `resume`, `continue_conversation`, `add_dirs` are blocked; each blocked key logs a warning; non-blocked keys pass through
-- [ ] T032 [P1] [US1] Write system_prompt merge test: when `SDK_OPTIONS` contains `system_prompt`, the platform system prompt dict is preserved and user text is appended under `## Custom Instructions` heading
-- [ ] T033 [P1] [US1] Run tests, verify they fail: `cd components/runners/ambient-runner && python -m pytest tests/test_sdk_options.py -v`
-- [ ] T034 [P1] [US1] Implement `_SDK_OPTIONS_DENYLIST` frozenset and `parse_sdk_options(env_var: str) -> dict` function in `components/runners/ambient-runner/ambient_runner/bridges/claude/bridge.py`. Parse JSON, apply denylist, log warnings for blocked keys
-- [ ] T035 [P1] [US1] Implement `_merge_system_prompt(platform_prompt: dict, user_prompt: str) -> dict` in `components/runners/ambient-runner/ambient_runner/bridges/claude/bridge.py`. Append user text under `## Custom Instructions` in the platform prompt's append field
-- [ ] T036 [P1] [US1] Integrate in `_ensure_adapter`: call `parse_sdk_options(os.getenv("SDK_OPTIONS", ""))`, handle `system_prompt` key via `_merge_system_prompt`, merge remaining keys into the `options` dict before constructing `ClaudeAgentAdapter` in `components/runners/ambient-runner/ambient_runner/bridges/claude/bridge.py`
-- [ ] T037 [P1] [US1] Run tests, verify they pass: `cd components/runners/ambient-runner && python -m pytest tests/test_sdk_options.py -v`
-- [ ] T038 [P1] [US1] Run runner linters: `cd components/runners/ambient-runner && ruff check . && ruff format --check .`
+---
 
-### Commit
+## Phase 4: Frontend — Wire Form into Session Creation (TDD)
 
-- [ ] T039 [P1] Commit Phase 3 runner: "feat(runner): parse SDK_OPTIONS env var with denylist and system prompt merge"
+**Goal**: Wrap existing `claude-agent-options/` form in a collapsible container, gate behind feature flag, wire into session create flow.
 
-### Frontend: Types
+**Existing on main**: `components/frontend/src/components/claude-agent-options/` has `AgentOptionsFields`, `claudeAgentOptionsSchema`, `claudeAgentOptionsDefaults`, and 11 field editors. Reuse these.
 
-- [ ] T040 [P1] [US1] Rename `agentOptions` field to `sdkOptions` with type `Record<string, unknown>` in `CreateAgenticSessionRequest` in `components/frontend/src/types/api/sessions.ts`. Update the TODO comment to reference `SDK_OPTIONS` env var
-- [ ] T041 [P1] [US1] Rename `agentOptions` field to `sdkOptions` in `CreateAgenticSessionRequest` in `components/frontend/src/types/agentic-session.ts` (canonical type location)
+- [ ] T030 [US1] Rename `agentOptions` to `sdkOptions` in `components/frontend/src/types/api/sessions.ts` and `components/frontend/src/types/agentic-session.ts`
+- [ ] T031 [US1] Create `components/frontend/src/components/__tests__/advanced-sdk-options.test.tsx` (TDD). Tests: not rendered when flag is disabled, renders collapsed by default when flag enabled, expands on click, form fields visible when expanded
+- [ ] T032 [US1] Create `components/frontend/src/components/advanced-sdk-options.tsx` — collapsible wrapper using Shadcn `Collapsible`. Imports `AgentOptionsFields` from `claude-agent-options`. Props: `projectName`, `form: UseFormReturn<ClaudeAgentOptionsForm>`, `disabled?`. Uses `useWorkspaceFlag(projectName, "advanced-sdk-options")` to gate visibility
+- [ ] T033 [US1] Wire into `components/frontend/src/app/projects/[name]/sessions/[sessionName]/components/new-session-view.tsx`: add `useForm<ClaudeAgentOptionsForm>` with defaults, render `<AdvancedSdkOptions>`, pass non-empty form values as `sdkOptions` in `onCreateSession` callback
+- [ ] T034 [US1] Wire into `components/frontend/src/app/projects/[name]/new/page.tsx`: accept `sdkOptions` in config, spread into create mutation payload
+- [ ] T035 [US1] Run frontend tests and build: `cd components/frontend && npx vitest run && npm run build`
 
-### Frontend: Wire AdvancedSdkOptions into NewSessionView (TDD)
+### Commit: `feat(frontend): add collapsible AdvancedSdkOptions gated by workspace flag`
 
-- [ ] T042 [P1] [US1] Create test file `components/frontend/src/components/__tests__/advanced-sdk-options.test.tsx`. Write tests: component renders collapsed by default; expanding reveals form fields; form values are emitted on change; component is not rendered when `advanced-sdk-options` flag is false
-- [ ] T043 [P1] [US1] Run tests, verify they fail: `cd components/frontend && npx vitest run --reporter=verbose src/components/__tests__/advanced-sdk-options.test.tsx`
-- [ ] T044 [P1] [US1] Create `components/frontend/src/components/advanced-sdk-options.tsx` — a collapsible wrapper that imports `AgentOptionsFields` from `components/claude-agent-options` and renders inside a `Collapsible` from shadcn/ui. Props: `projectName: string`, `form: UseFormReturn<ClaudeAgentOptionsForm>`, `disabled?: boolean`. Uses `useWorkspaceFlag(projectName, "advanced-sdk-options")` to gate visibility
-- [ ] T045 [P1] [US1] In `components/frontend/src/app/projects/[name]/sessions/[sessionName]/components/new-session-view.tsx`: import `AdvancedSdkOptions`, add `useForm<ClaudeAgentOptionsForm>` with `claudeAgentOptionsDefaults`, render `<AdvancedSdkOptions>` between the input area and pending repo badges. Add `sdkOptions` to the `onCreateSession` callback config type
-- [ ] T046 [P1] [US1] In `NewSessionViewProps.onCreateSession` callback type, add `sdkOptions?: Record<string, unknown>`. In `handleSubmit`, collect non-empty form values and pass as `sdkOptions`
-- [ ] T047 [P1] [US1] In `components/frontend/src/app/projects/[name]/new/page.tsx`: update `handleCreateNewSession` config type to include `sdkOptions`. Wire `config.sdkOptions` into the `createSessionMutation.mutate` data payload as `sdkOptions`
-- [ ] T048 [P1] [US1] Run tests, verify they pass: `cd components/frontend && npx vitest run --reporter=verbose src/components/__tests__/advanced-sdk-options.test.tsx`
-- [ ] T049 [P1] [US1] Run full frontend test suite: `cd components/frontend && npx vitest run`
-- [ ] T050 [P1] [US1] Run frontend build: `cd components/frontend && npm run build`
+---
 
-### Frontend: Update create-session-dialog.tsx (dead code cleanup)
+## Phase 5: Drift Detection (US2)
 
-- [ ] T051 [P1] [US1] In `components/frontend/src/components/create-session-dialog.tsx`, update references from `advanced-agent-options` flag to `advanced-sdk-options` and from `agentOptions` to `sdkOptions` in the mutation payload (if this dialog is still used anywhere; otherwise note it as dead code)
+**Goal**: Weekly GHA workflow introspects `ClaudeAgentOptions` from PyPI, compares against manifest, opens PR on drift.
 
-### Commit
+- [ ] T040 [US2] Generate `components/runners/ambient-runner/sdk-options-manifest.json` by introspecting the current `claude-agent-sdk` package: install via `uv pip install claude-agent-sdk`, extract fields from `ClaudeAgentOptions.model_fields` (Pydantic), write `{"generatedFrom": "claude-agent-sdk", "generatedAt": "<ISO>", "sdkVersion": "<version>", "options": {"field_name": {"type": "<annotation>", "required": <bool>}}}`
+- [ ] T041 [US2] Create `scripts/sdk-options-drift-check.py`: import `ClaudeAgentOptions`, introspect via `model_fields`, compare against manifest, exit 0 (no drift), exit 1 (drift found — write updated manifest), exit 2 (error). Must handle: `ImportError` (hard fail), Pydantic v1 vs v2 (check for `model_fields` vs `__fields__`)
+- [ ] T042 [US2] Create `.github/workflows/claude-sdk-options-drift.yml`: weekly cron `0 6 * * 1` + `workflow_dispatch`. Steps: checkout, setup Python 3.12, `pip install claude-agent-sdk`, run drift script, if exit 1: create branch `auto/sdk-options-drift-<date>`, commit updated manifest, open PR with `amber:auto-fix` label. If exit 2: fail the workflow loudly.
+- [ ] T043 [US2] Test drift detection end-to-end: run `python scripts/sdk-options-drift-check.py` locally, verify clean exit with current manifest
 
-- [ ] T052 [P1] Commit Phase 3 frontend: "feat(frontend): add AdvancedSdkOptions collapsible form gated by workspace flag"
+### Commit: `feat(ci): add weekly Claude SDK options drift detection workflow`
 
-## Phase 4: User Story 2 -- SDK Options Drift Detection (P2)
+---
 
-- [ ] T060 [P2] [US2] Create `components/runners/ambient-runner/sdk-options-manifest.json` with current `ClaudeAgentOptions` fields and types from `claude-agent-sdk`. Format: `{"version": "0.1.48", "fields": {"temperature": "float", "max_turns": "int", ...}}`
-- [ ] T061 [P2] [US2] Create `.github/workflows/claude-sdk-options-drift.yml`: weekly cron (`0 6 * * 1`) + `workflow_dispatch`. Job: checkout, setup Python 3.12, `uv pip install claude-agent-sdk`, run introspection script, compare against manifest, open PR with `amber:auto-fix` label if drift detected, clean exit if no drift, hard fail on errors
-- [ ] T062 [P2] [US2] Create `scripts/sdk-options-drift-check.py`: import `ClaudeAgentOptions` from `claude_agent_sdk`, introspect fields via `typing.get_type_hints()` or `dataclasses.fields()`, compare against `sdk-options-manifest.json`, write updated manifest if drift found, exit 0 on no drift, exit 1 on drift (for GHA to detect), exit 2 on error
-- [ ] T063 [P2] [US2] Write test in `components/runners/ambient-runner/tests/test_sdk_options.py`: mock `ClaudeAgentOptions` with an extra field, verify drift script detects it
-- [ ] T064 [P2] [US2] Run drift check manually to verify clean baseline: `cd components/runners/ambient-runner && python ../../scripts/sdk-options-drift-check.py`
+## Phase 6: Verify
 
-### Commit
+- [ ] T050 Run all component test suites: backend (`make test`), frontend (`npx vitest run --coverage`), runner (`python -m pytest tests/ -v`)
+- [ ] T051 Run `npm run build` in frontend (must pass with 0 errors, 0 warnings)
+- [ ] T052 Run `make lint` (pre-commit hooks on all changed files)
+- [ ] T053 Grep changed `.tsx`/`.ts` files for `: any` or `as any` — must be zero
+- [ ] T054 Cross-reference spec acceptance scenarios SC-001 through SC-005 against test coverage
 
-- [ ] T065 [P2] Commit Phase 4: "feat(ci): add weekly Claude SDK options drift detection workflow"
+### Commit (if fixes needed): `chore: lint and polish for advanced SDK options`
 
-## Phase 5: Polish
+---
 
-- [ ] T070 [P1] Run full backend test suite: `cd components/backend && make test`
-- [ ] T071 [P1] Run full frontend test suite with coverage: `cd components/frontend && npx vitest run --coverage`
-- [ ] T072 [P1] Run full runner test suite: `cd components/runners/ambient-runner && python -m pytest tests/ -v`
-- [ ] T073 [P1] Run pre-commit hooks on all changed files: `make lint`
-- [ ] T074 [P1] Run frontend production build: `cd components/frontend && npm run build`
-- [ ] T075 [P1] Verify no `any` types in new/modified frontend code (grep changed .tsx/.ts files for `: any` or `as any`)
-- [ ] T076 [P1] Verify all acceptance scenarios from spec.md are covered by tests (cross-reference SC-001 through SC-005)
-- [ ] T077 [P1] Final commit if any polish changes: "chore: polish and lint fixes for advanced SDK options"
+## Dependencies
+
+- **Phase 1** → Phases 2, 3, 4 (flag must exist before frontend gate works)
+- **Phase 2** → Phase 4 (backend must accept `sdkOptions` before frontend sends it)
+- **Phase 3** → independent (runner reads env var, no compile-time dependency on backend)
+- **Phase 4** → depends on Phase 2 (API contract)
+- **Phase 5** → independent (drift workflow has no code dependency on other phases)
+- **Phase 6** → all phases complete
+
+### Parallel opportunities
+
+- **Phases 2 + 3 + 5** can run in parallel (backend, runner, drift are independent)
+- Within Phase 4: T030 (types) must precede T031-T035
