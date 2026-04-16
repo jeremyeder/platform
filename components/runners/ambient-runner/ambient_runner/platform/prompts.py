@@ -241,6 +241,13 @@ def build_workspace_context_prompt(
         prompt += "## Corrections Feedback\n\n"
         prompt += CORRECTION_DETECTION_INSTRUCTIONS
 
+    # Project memory injection (learned files from docs/learned/)
+    from ambient_runner.platform.learned import get_project_memory_prompt
+
+    memory_prompt = get_project_memory_prompt(workspace_path)
+    if memory_prompt:
+        prompt += memory_prompt
+
     return prompt
 
 
