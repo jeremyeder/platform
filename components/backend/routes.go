@@ -132,6 +132,11 @@ func registerRoutes(r *gin.Engine) {
 			projectGroup.POST("/feature-flags/:flagName/enable", handlers.EnableFeatureFlag)
 			projectGroup.POST("/feature-flags/:flagName/disable", handlers.DisableFeatureFlag)
 
+			// Feedback loop endpoints (gated by learning-agent-loop feature flag)
+			projectGroup.GET("/feedback-loop/config", handlers.GetFeedbackLoopConfig)
+			projectGroup.PUT("/feedback-loop/config", handlers.PutFeedbackLoopConfig)
+			projectGroup.GET("/feedback-loop/history", handlers.GetFeedbackLoopHistory)
+
 			// GitLab authentication endpoints (DEPRECATED - moved to cluster-scoped)
 			// Kept for backward compatibility, will be removed in future version
 			projectGroup.POST("/auth/gitlab/connect", handlers.ConnectGitLabGlobal)
