@@ -8,11 +8,16 @@ loop (GitHub Action) periodically queries these scores and creates
 improvement sessions to update workflow instructions and repo context.
 """
 
+import asyncio
 import json
 import logging
 import os
 import subprocess
+import urllib.error
+import urllib.request
 from typing import Any
+
+from ambient_runner.platform.utils import get_bot_token
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +33,7 @@ CORRECTION_TYPES = [
     "style",  # right result, wrong approach or pattern
 ]
 
-CORRECTION_SOURCES = ["human", "rubric"]
+CORRECTION_SOURCES = ["human", "rubric", "ui"]
 
 CORRECTION_TOOL_DESCRIPTION_BASE = (
     "Log a correction whenever the user redirects, corrects, or changes what "
@@ -283,6 +288,18 @@ def create_correction_mcp_tool(
         )
 
         if success:
+            # Fire-and-forget POST to backend corrections endpoint
+            context = _get_session_context()
+            asyncio.ensure_future(
+                _post_correction_to_backend(
+                    session_name=context.get("session_name", _session_id),
+                    correction_type=correction_type,
+                    agent_action=agent_action,
+                    user_correction=user_correction,
+                    target_label=target_label,
+                    source=source,
+                )
+            )
             return {
                 "content": [
                     {
@@ -576,3 +593,66 @@ def _log_correction_to_langfuse(
         msg = str(e)
         logger.error(f"Failed to log correction to Langfuse: {msg}")
         return False, msg
+
+
+# ------------------------------------------------------------------
+# Backend POST (fire-and-forget)
+# ------------------------------------------------------------------
+
+
+async def _post_correction_to_backend(
+    session_name: str,
+    correction_type: str,
+    agent_action: str,
+    user_correction: str,
+    target_label: str,
+    source: str,
+) -> None:
+    """Fire-and-forget POST to backend corrections endpoint.
+
+    Non-blocking, 3s timeout. Failures are logged as warnings but never
+    raised -- the Langfuse write is the system of record.
+    """
+    backend_url = os.getenv("BACKEND_API_URL", "").rstrip("/")
+    project = os.getenv("AGENTIC_SESSION_NAMESPACE", "").strip()
+
+    if not backend_url or not project:
+        logger.debug(
+            "Skipping backend corrections POST: BACKEND_API_URL or "
+            "AGENTIC_SESSION_NAMESPACE not set"
+        )
+        return
+
+    url = f"{backend_url}/projects/{project}/corrections"
+    payload = json.dumps(
+        {
+            "sessionName": session_name,
+            "correctionType": correction_type,
+            "agentAction": agent_action[:500],
+            "userCorrection": user_correction[:500],
+            "target": target_label,
+            "source": source,
+        }
+    ).encode("utf-8")
+
+    token = get_bot_token()
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+        loop = asyncio.get_event_loop()
+        await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=3)),
+            timeout=3,
+        )
+        logger.info(
+            "Correction posted to backend: project=%s session=%s",
+            project,
+            session_name,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Backend corrections POST timed out (3s): %s", url)
+    except Exception as e:
+        logger.warning("Backend corrections POST failed (non-fatal): %s", e)

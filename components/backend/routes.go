@@ -135,6 +135,11 @@ func registerRoutes(r *gin.Engine) {
 			// Learned files endpoint (project memory store)
 			projectGroup.GET("/learned", handlers.ListLearnedEntries)
 
+			// Corrections pipeline endpoints (gated by learning-agent-loop feature flag)
+			projectGroup.POST("/corrections", handlers.PostCorrection)
+			projectGroup.GET("/corrections", handlers.ListCorrections)
+			projectGroup.GET("/corrections/summary", handlers.GetCorrectionsSummary)
+
 			// GitLab authentication endpoints (DEPRECATED - moved to cluster-scoped)
 			// Kept for backward compatibility, will be removed in future version
 			projectGroup.POST("/auth/gitlab/connect", handlers.ConnectGitLabGlobal)
