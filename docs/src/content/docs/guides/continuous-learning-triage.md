@@ -91,11 +91,12 @@ When you open a CL draft PR, run through this checklist:
 Once you merge a CL pull request, here is what happens:
 
 1. The learned file lands on the default branch in `docs/learned/`.
-2. The wiki compiler (`llm-wiki-compiler`) runs — either on push via GitHub Action or manually — and compiles `docs/learned/` along with other documentation sources into topic-based wiki articles.
-3. The compiled knowledge is surfaced through the project's `CLAUDE.md` (or equivalent project instructions), which the agent loads naturally at session start.
-4. The agent uses this knowledge throughout the session. When it applies a learned convention, it cites the source with a `[memory:PM-XXX]` badge in its response.
+2. The wiki compiler (`llm-wiki-compiler`) runs — either on push via GitHub Action or manually — and compiles `docs/learned/` along with other documentation sources into topic-based wiki articles in `docs/wiki/`.
+3. At the start of the next session, the wiki-compiler SessionStart hook injects the **wiki INDEX** — a lightweight topic listing (a few hundred tokens). The agent does not load all articles upfront.
+4. When the agent encounters a relevant situation, it reads the specific topic article from `docs/wiki/` on demand. This is progressive disclosure — no context window bloat, but the knowledge is always available.
+5. When the agent applies learned knowledge, it cites the source with a `[memory:PM-XXX]` badge in its response.
 
-There is no custom file-reading code in the runner. Knowledge flows through the same path as all other project documentation — the wiki compiler distills it, `CLAUDE.md` references it, and the agent picks it up. This means your triage decisions have a direct, visible effect. Merged knowledge shows up in agent responses. Closed PRs disappear. You control what your agents remember.
+There is no custom file-reading code in the runner. Knowledge flows through the same path as all other project documentation — the wiki compiler distills it, the index tells the agent what's available, and the agent pulls in details when needed. This means your triage decisions have a direct, visible effect. Merged knowledge shows up in agent responses. Closed PRs disappear. You control what your agents remember.
 
 ## Where Knowledge Comes From
 
