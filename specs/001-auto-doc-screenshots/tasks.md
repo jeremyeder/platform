@@ -44,13 +44,13 @@
 
 **Independent Test**: Open docs dev server, navigate to quickstart page, toggle Starlight theme — correct screenshot variant displays.
 
-- [ ] T008 [US1] Embed screenshot HTML in `docs/src/content/docs/getting-started/quickstart-ui.md` (workspaces-page, integrations-page, new-session-dialog, session-page)
-- [ ] T009 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/sessions.md` (session-list, session-page, new-session-dialog)
-- [ ] T010 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/integrations.md` (integrations-page)
-- [ ] T011 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/workspaces.md` (workspace-settings, workspace-sharing, api-keys)
-- [ ] T012 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/scheduled-sessions.md` (scheduled-sessions)
-- [ ] T013 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/context-and-artifacts.md` (file-browser)
-- [ ] T014 [US1] Verify docs build succeeds: `cd docs && npm run build`
+- [x] T008 [US1] Embed screenshot HTML in `docs/src/content/docs/getting-started/quickstart-ui.md` (workspaces-page, integrations-page, new-session-dialog, session-page)
+- [x] T009 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/sessions.md` (session-list, session-page, new-session-dialog)
+- [x] T010 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/integrations.md` (integrations-page)
+- [x] T011 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/workspaces.md` (workspace-settings, workspace-sharing, api-keys)
+- [x] T012 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/scheduled-sessions.md` (scheduled-sessions)
+- [x] T013 [P] [US1] Embed screenshot HTML in `docs/src/content/docs/concepts/context-and-artifacts.md` (file-browser)
+- [x] T014 [US1] Verify docs build succeeds: `cd docs && npm run build`
 - [ ] T015 [US1] Capture screenshots locally: `make kind-up CONTAINER_ENGINE=docker && make screenshots`
 - [ ] T016 [US1] Verify theme switching in docs dev server: `cd docs && npm run dev`, toggle themes
 - [ ] T017 [US1] Commit captured screenshots in `docs/public/images/screenshots/`
@@ -65,7 +65,7 @@
 
 **Independent Test**: Trigger workflow via `workflow_dispatch`, confirm it completes and creates a PR.
 
-- [ ] T018 [US2] Create GHA workflow at `.github/workflows/screenshots.yml` with daily cron, kind setup, Cypress capture, change detection, and auto-PR creation
+- [x] T018 [US2] Create GHA workflow at `.github/workflows/screenshots.yml` with daily cron, kind setup, Cypress capture, change detection, and auto-PR creation
 - [ ] T019 [US2] Push branch and trigger workflow via `workflow_dispatch` to validate
 
 **Checkpoint**: CI pipeline captures screenshots and opens PRs autonomously
@@ -78,8 +78,8 @@
 
 **Independent Test**: Push docs change to main — appears on Netlify, not on GitHub Pages.
 
-- [ ] T020 [US3] Change `.github/workflows/docs.yml` trigger from `push: branches: [main]` to `push: tags: ['v*']`
-- [ ] T021 [US3] Verify local docs build: `cd docs && npm run build`
+- [x] T020 [US3] Change `.github/workflows/docs.yml` trigger from `push: branches: [main]` to `push: tags: ['v*']`
+- [x] T021 [US3] Verify local docs build: `cd docs && npm run build`
 - [ ] T022 [US3] Push to main, verify Netlify deploys with correct CSS and screenshot paths
 
 **Checkpoint**: Two-tier hosting operational — Netlify for main, GitHub Pages for releases
