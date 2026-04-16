@@ -134,7 +134,7 @@ A developer creates a quick 2-turn session. The session completes, but no extrac
 
 ## Assumptions
 
-- Spec 002 establishes the `docs/learned/` file format and directory structure.
+- Spec 002 establishes the `docs/learned/` file format, directory structure, and wiki compiler pipeline for delivering knowledge to agents.
 - Spec 008 provides the "Pending Review" UI section that surfaces draft PRs.
 - The AG-UI event store retains session events long enough for post-completion extraction.
 - The extraction model is available via the same LLM provider credentials configured for the project.

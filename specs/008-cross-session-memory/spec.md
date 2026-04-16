@@ -32,17 +32,17 @@ A project maintainer navigates to the "Project Memory" tab in their project view
 
 ### User Story 2 - Runner Loads Memories at Session Init (Priority: P1)
 
-When a new agentic session starts, the runner reads `docs/learned/` from the workspace repo (per spec 002) and injects all entries into the system prompt as a structured `## Project Memory` section. The agent begins the session aware of past corrections and patterns.
+When a new agentic session starts, the wiki-compiler SessionStart hook injects compiled wiki articles (which include synthesized knowledge from `docs/learned/`) into the agent's context. The agent begins the session aware of past corrections and patterns through the same path as all other project documentation.
 
 **Why this priority**: This is the core value proposition — sessions that learn from prior sessions.
 
-**Independent Test**: Create a workspace repo with learned files across both types. Start a new session. Inspect the system prompt and confirm all entries appear grouped by type.
+**Independent Test**: Create a workspace repo with learned files, run the wiki compiler, then start a session. Confirm the agent has access to the compiled knowledge.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project with learned files, **When** the runner initializes a new session, **Then** it reads `docs/learned/` and injects entries into a `## Project Memory` section grouped under `### Corrections` and `### Patterns`.
-2. **Given** no learned files exist, **When** the runner initializes, **Then** the `## Project Memory` section is omitted entirely.
-3. **Given** the workspace clone fails or `docs/learned/` is unreadable, **When** the runner initializes, **Then** the session proceeds without memory injection and logs a warning.
+1. **Given** a project with compiled wiki articles including learned knowledge, **When** a session starts, **Then** the wiki-compiler SessionStart hook injects the wiki index into the agent's context.
+2. **Given** no learned files or wiki articles exist, **When** a session starts, **Then** no wiki injection occurs (standard behavior).
+3. **Given** the wiki compiler has not been run yet, **When** a session starts, **Then** the session proceeds normally without compiled knowledge (graceful degradation).
 
 ---
 
@@ -99,7 +99,7 @@ A project maintainer wants to record a known fact. They click "Add Memory" in th
 - **FR-003**: System MUST support filtering entries by type.
 - **FR-004**: System MUST display a "Pending Review" section listing open draft PRs with the `continuous-learning` label in the workspace repo, with links to each PR on GitHub.
 - **FR-005**: System MUST provide "View on GitHub" links for each learned file, pointing to the file on the repo's default branch.
-- **FR-006**: Runner MUST read `docs/learned/` at session init and inject into system prompt (delegated to spec 002 implementation).
+- **FR-006**: Knowledge from `docs/learned/` reaches agents via the wiki compiler → CLAUDE.md pipeline (spec 002). No custom runner code is needed for knowledge delivery.
 - **FR-007**: Runner MUST register a `suggest_memory` tool that accepts `content` (string, required), `type` (enum: correction|pattern, required), and `title` (string, required).
 - **FR-008**: The `suggest_memory` tool MUST write a markdown file with proper frontmatter to `docs/learned/<type>s/<date>-<slug>.md` on a new branch named `learned/<type>-<date>-<slug>`.
 - **FR-009**: The `suggest_memory` tool MUST open a draft PR with the `continuous-learning` label, including the originating session name in the PR description.
@@ -129,7 +129,7 @@ A project maintainer wants to record a known fact. They click "Add Memory" in th
 
 ## Dependencies
 
-- **Spec 002 — Project Memory Store (File-Based)**: Backend read API and runner injection logic.
+- **Spec 002 — Project Memory Store (File-Based)**: Backend read API, file format, and wiki compiler pipeline.
 - **Spec 007 — Event-Driven Feedback Loop**: Improvement sessions may write learned files. Cross-session memory can ship without this.
 - **Spec 009 — Post-Session Insight Extraction**: Writes learned files after session completion. Can ship independently.
 - **Runner tool infrastructure**: `components/runners/ambient-runner/ambient_runner/bridges/claude/tools.py`

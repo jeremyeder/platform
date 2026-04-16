@@ -121,7 +121,7 @@ A user clicks a citation badge in a chat message and is taken to the full memory
 
 - The Project Memory Store (spec 002) is implemented and memories are stored as structured entries with unique IDs, content, metadata, and a version field.
 - The Corrections Realtime Pipeline (spec 003) is implemented and corrections are persisted with type classifications.
-- The runner already has a system prompt injection point where project-level context is loaded at session init.
+- Knowledge from `docs/learned/` reaches agents via the wiki compiler → CLAUDE.md pipeline (spec 002). The citation instruction block is added to compiled wiki articles or CLAUDE.md.
 - The agent (Claude) reliably follows citation format instructions in the system prompt when the instruction is clear and the memory entries are well-structured. Citation rate may be below 100% — this is expected LLM behavior and is reflected in SC-001.
 - Shadcn/UI provides the base components (Badge, Popover, Card, Tabs) needed for the citation badges and dashboard.
 - The frontend chat message renderer already supports custom inline component injection (or can be extended to support it via a markdown post-processing step).
