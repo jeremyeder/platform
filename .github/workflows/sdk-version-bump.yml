@@ -104,7 +104,7 @@ jobs:
         if: steps.check.outputs.updates_available == 'true'
         id: drift
         run: |
-          pip install claude-agent-sdk 2>/dev/null
+          pip install claude-agent-sdk
           EXIT_CODE=0
           python scripts/sdk-options-drift-check.py || EXIT_CODE=$?
           echo "drift_exit=$EXIT_CODE" >> "$GITHUB_OUTPUT"
