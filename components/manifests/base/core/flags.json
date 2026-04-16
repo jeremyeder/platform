@@ -39,6 +39,16 @@
           "value": "workspace"
         }
       ]
+    },
+    {
+      "name": "learning-agent-loop",
+      "description": "Enable post-session insight extraction and continuous learning pipeline",
+      "tags": [
+        {
+          "type": "scope",
+          "value": "workspace"
+        }
+      ]
     }
   ]
 }
