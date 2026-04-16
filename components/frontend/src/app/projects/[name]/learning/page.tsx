@@ -121,7 +121,7 @@ function CorrectionBreakdown({
               <div key={type}>
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span>
-                    {CORRECTION_TYPE_LABELS[type] || type}
+                    {CORRECTION_TYPE_LABELS[type as keyof typeof CORRECTION_TYPE_LABELS] || type}
                   </span>
                   <span className="text-muted-foreground">
                     {count} ({Math.round(pct)}%)
@@ -154,7 +154,7 @@ function TimelineItem({ entry }: { entry: TimelineEntry }) {
           <span>{new Date(entry.timestamp).toLocaleDateString()}</span>
           {entry.correctionType && (
             <span className="px-1.5 py-0.5 rounded bg-muted">
-              {CORRECTION_TYPE_LABELS[entry.correctionType] ||
+              {CORRECTION_TYPE_LABELS[entry.correctionType as keyof typeof CORRECTION_TYPE_LABELS] ||
                 entry.correctionType}
             </span>
           )}
