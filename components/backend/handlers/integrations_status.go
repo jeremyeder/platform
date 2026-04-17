@@ -39,6 +39,9 @@ func GetIntegrationsStatus(c *gin.Context) {
 	// GitLab status
 	response["gitlab"] = getGitLabStatusForUser(ctx, userID)
 
+	// Gerrit status
+	response["gerrit"] = getGerritStatusForUser(ctx, userID)
+
 	// MCP server credentials status
 	response["mcpServers"] = getMCPServerStatusForUser(ctx, userID)
 
@@ -126,6 +129,26 @@ func getJiraStatusForUser(ctx context.Context, userID string) gin.H {
 		"updatedAt": creds.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		"valid":     true, // Always true - trust user's configuration
 	}
+}
+
+func getGerritStatusForUser(ctx context.Context, userID string) gin.H {
+	instances, err := listGerritCredentials(ctx, userID)
+	if err != nil || len(instances) == 0 {
+		return gin.H{"instances": []gin.H{}}
+	}
+
+	result := make([]gin.H, 0, len(instances))
+	for _, inst := range instances {
+		result = append(result, gin.H{
+			"connected":    true,
+			"instanceName": inst.InstanceName,
+			"url":          inst.URL,
+			"authMethod":   inst.AuthMethod,
+			"updatedAt":    inst.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	return gin.H{"instances": result}
 }
 
 func getGitLabStatusForUser(ctx context.Context, userID string) gin.H {

@@ -93,6 +93,7 @@ func registerRoutes(r *gin.Engine) {
 			projectGroup.GET("/agentic-sessions/:sessionName/credentials/google", handlers.GetGoogleCredentialsForSession)
 			projectGroup.GET("/agentic-sessions/:sessionName/credentials/jira", handlers.GetJiraCredentialsForSession)
 			projectGroup.GET("/agentic-sessions/:sessionName/credentials/gitlab", handlers.GetGitLabTokenForSession)
+			projectGroup.GET("/agentic-sessions/:sessionName/credentials/gerrit", handlers.GetGerritCredentialsForSession)
 			projectGroup.GET("/agentic-sessions/:sessionName/credentials/mcp/:serverName", handlers.GetMCPCredentialsForSession)
 
 			// Session export
@@ -166,6 +167,13 @@ func registerRoutes(r *gin.Engine) {
 		api.GET("/auth/jira/status", handlers.GetJiraStatus)
 		api.DELETE("/auth/jira/disconnect", handlers.DisconnectJira)
 		api.POST("/auth/jira/test", handlers.TestJiraConnection)
+
+		// Cluster-level Gerrit (user-scoped, multi-instance)
+		api.POST("/auth/gerrit/connect", handlers.ConnectGerrit)
+		api.POST("/auth/gerrit/test", handlers.TestGerritConnection)
+		api.GET("/auth/gerrit/instances", handlers.ListGerritInstances)
+		api.GET("/auth/gerrit/:instanceName/status", handlers.GetGerritStatus)
+		api.DELETE("/auth/gerrit/:instanceName/disconnect", handlers.DisconnectGerrit)
 
 		// Cluster-level GitLab (user-scoped)
 		api.POST("/auth/gitlab/connect", handlers.ConnectGitLabGlobal)

@@ -278,6 +278,24 @@ async def fetch_gitlab_credentials(context: RunnerContext) -> dict:
     return data
 
 
+async def fetch_gerrit_credentials(context: RunnerContext) -> list[dict]:
+    """Fetch Gerrit credentials from backend API.
+
+    Returns list of instance dicts with: instanceName, url, authMethod,
+    username, httpToken, gitcookiesContent (depending on auth method).
+    """
+    data = await _fetch_credential(context, "gerrit")
+    # The endpoint returns a list (multiple instances), not a single dict
+    if isinstance(data, list):
+        logger.info(f"Fetched {len(data)} Gerrit instance(s)")
+        return data
+    # If single instance returned (shouldn't happen but handle gracefully)
+    if isinstance(data, dict) and data:
+        logger.info("Fetched 1 Gerrit instance")
+        return [data]
+    return []
+
+
 async def fetch_gitlab_token(context: RunnerContext) -> str:
     """Fetch GitLab token from backend API."""
     data = await fetch_gitlab_credentials(context)
@@ -306,11 +324,18 @@ async def populate_runtime_credentials(context: RunnerContext) -> None:
     logger.info("Fetching fresh credentials from backend API...")
 
     # Fetch all credentials concurrently
-    google_creds, jira_creds, gitlab_creds, github_creds = await asyncio.gather(
+    (
+        google_creds,
+        jira_creds,
+        gitlab_creds,
+        github_creds,
+        gerrit_creds,
+    ) = await asyncio.gather(
         fetch_google_credentials(context),
         fetch_jira_credentials(context),
         fetch_gitlab_credentials(context),
         fetch_github_credentials(context),
+        fetch_gerrit_credentials(context),
         return_exceptions=True,
     )
 
@@ -403,6 +428,21 @@ async def populate_runtime_credentials(context: RunnerContext) -> None:
             git_user_name = github_creds["userName"]
         if github_creds.get("email"):
             git_user_email = github_creds["email"]
+
+    # Gerrit credentials
+    if isinstance(gerrit_creds, Exception):
+        logger.warning(f"Failed to fetch Gerrit credentials: {gerrit_creds}")
+        if isinstance(gerrit_creds, PermissionError):
+            auth_failures.append(str(gerrit_creds))
+            # Clear config on auth failure
+            from ambient_runner.bridges.claude.mcp import generate_gerrit_config
+
+            generate_gerrit_config([])
+        # On network error, preserve existing config (don't clear)
+    else:
+        from ambient_runner.bridges.claude.mcp import generate_gerrit_config
+
+        generate_gerrit_config(gerrit_creds)
 
     # Configure git identity, credential helper, and gh CLI wrapper
     await configure_git_identity(git_user_name, git_user_email)
