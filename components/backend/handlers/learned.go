@@ -303,7 +303,7 @@ func CreateLearnedPR(c *gin.Context) {
 	token, err := GetGitHubTokenRepo(c.Request.Context(), reqK8s, reqDyn, project, userID.(string))
 	if err != nil {
 		log.Printf("Failed to get GitHub token for learned PR, project %s: %v", project, err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "GitHub authentication failed. Configure GitHub integration in Workspace Settings."})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "GitHub authentication required. Connect GitHub via the Integrations page (GitHub App or PAT)."})
 		return
 	}
 	_ = repoURL
