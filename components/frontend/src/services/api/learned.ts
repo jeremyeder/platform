@@ -70,9 +70,10 @@ export type CreateMemoryResponse = {
  */
 export async function getLearnedFiles(
   projectName: string,
-  params?: { type?: string; page?: number; pageSize?: number }
+  params?: { type?: string; page?: number; pageSize?: number; repo?: string }
 ): Promise<LearnedFilesResponse> {
   const searchParams: Record<string, string | number | boolean> = {};
+  if (params?.repo) searchParams.repo = params.repo;
   if (params?.type) searchParams.type = params.type;
   if (params?.page !== undefined) searchParams.page = params.page;
   if (params?.pageSize !== undefined) searchParams.pageSize = params.pageSize;
@@ -88,9 +89,13 @@ export async function getLearnedFiles(
  */
 export async function getLearnedDraftPRs(
   projectName: string,
+  params?: { repo?: string },
 ): Promise<LearnedDraftPRsResponse> {
+  const searchParams: Record<string, string> = {};
+  if (params?.repo) searchParams.repo = params.repo;
   return apiClient.get<LearnedDraftPRsResponse>(
-    `/projects/${projectName}/learned/prs`
+    `/projects/${projectName}/learned/prs`,
+    { params: searchParams }
   );
 }
 

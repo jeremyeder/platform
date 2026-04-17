@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useLearnedFiles, useLearnedDraftPRs, useCreateMemory } from "@/services/queries/use-learned";
 import { useInputHistory } from "@/hooks/use-input-history";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { LearnedEntry, LearnedDraftPR } from "@/services/api/learned";
 
 type ProjectMemorySectionProps = {
@@ -46,11 +47,16 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [configuredRepo, setConfiguredRepo] = useLocalStorage<string>(
+    `memory-repo:${projectName}`,
+    ""
+  );
+  const [repoInput, setRepoInput] = useState(configuredRepo);
   const [newMemory, setNewMemory] = useState({
     title: "",
     content: "",
     type: "correction" as "correction" | "pattern",
-    repo: "",
+    repo: configuredRepo,
   });
 
   const {
@@ -60,12 +66,15 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
     type: typeFilter || undefined,
     page: currentPage,
     pageSize: PAGE_SIZE,
-  });
+    repo: configuredRepo || undefined,
+  }, { enabled: !!configuredRepo });
 
   const {
     data: prsData,
     isLoading: prsLoading,
-  } = useLearnedDraftPRs(projectName);
+  } = useLearnedDraftPRs(projectName, {
+    repo: configuredRepo || undefined,
+  }, { enabled: !!configuredRepo });
 
   const createMemory = useCreateMemory();
   const { addToHistory: addRepoToHistory } = useInputHistory("memory-target-repo");
@@ -104,6 +113,7 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
       {
         onSuccess: (result) => {
           addRepoToHistory(repoUrl);
+          setConfiguredRepo(repoUrl);
           toast.success(
             `Draft PR #${result.prNumber} created`,
             {
@@ -123,8 +133,57 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
     );
   };
 
+  // Repo config banner
+  const repoConfigBanner = !configuredRepo ? (
+    <Card>
+      <CardContent className="flex items-center gap-4 py-4">
+        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm font-medium">No target repository configured</p>
+          <p className="text-xs text-muted-foreground">
+            Set a repository to view learned files and draft PRs
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <InputWithHistory
+            historyKey="memory-target-repo"
+            placeholder="https://github.com/owner/repo"
+            className="w-80"
+            value={repoInput}
+            onChange={(e) => setRepoInput(e.target.value)}
+          />
+          <Button
+            size="sm"
+            disabled={!repoInput.trim() || !/^https:\/\/(github\.com|gitlab\.com|gitlab\.[a-z]+\.[a-z]+)\//.test(repoInput.trim())}
+            onClick={() => {
+              setConfiguredRepo(repoInput.trim());
+              addRepoToHistory(repoInput.trim());
+            }}
+          >
+            Set
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  ) : (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <span>Repository: <code className="bg-muted px-1 py-0.5 rounded">{configuredRepo}</code></span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-xs"
+        onClick={() => {
+          setConfiguredRepo("");
+          setRepoInput("");
+        }}
+      >
+        Change
+      </Button>
+    </div>
+  );
+
   // Empty state
-  if (!entriesLoading && entries.length === 0 && !typeFilter && draftPRs.length === 0) {
+  if (!configuredRepo || (!entriesLoading && entries.length === 0 && !typeFilter && draftPRs.length === 0)) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -144,7 +203,9 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
           />
         </div>
 
-        <Card>
+        {repoConfigBanner}
+
+        {configuredRepo && <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <Brain className="h-12 w-12 text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-medium mb-2">No memories yet</h3>
@@ -159,7 +220,7 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
               manually using the &quot;Add Memory&quot; button above.
             </p>
           </CardContent>
-        </Card>
+        </Card>}
       </div>
     );
   }
@@ -204,6 +265,8 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
           />
         </div>
       </div>
+
+      {repoConfigBanner}
 
       {/* Pending Review Section */}
       {draftPRs.length > 0 && (

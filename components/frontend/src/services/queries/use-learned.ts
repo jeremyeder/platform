@@ -23,14 +23,14 @@ export const learnedKeys = {
  */
 export function useLearnedFiles(
   projectName: string,
-  params?: { type?: string; page?: number; pageSize?: number },
+  params?: { type?: string; page?: number; pageSize?: number; repo?: string },
   options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: learnedKeys.list(projectName, params?.type, params?.page),
     queryFn: () => learnedApi.getLearnedFiles(projectName, params),
     enabled: (options?.enabled ?? true) && !!projectName,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
   });
 }
 
@@ -39,13 +39,14 @@ export function useLearnedFiles(
  */
 export function useLearnedDraftPRs(
   projectName: string,
+  params?: { repo?: string },
   options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: learnedKeys.prList(projectName),
-    queryFn: () => learnedApi.getLearnedDraftPRs(projectName),
+    queryFn: () => learnedApi.getLearnedDraftPRs(projectName, params),
     enabled: (options?.enabled ?? true) && !!projectName,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
   });
 }
 
