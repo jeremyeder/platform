@@ -381,10 +381,10 @@ func GetGerritCredentialsForSession(c *gin.Context) {
 			"authMethod":   inst.AuthMethod,
 		}
 		switch inst.AuthMethod {
-		case "http_basic":
+		case gerritAuthHTTPBasic:
 			entry["username"] = inst.Username
 			entry["httpToken"] = inst.HTTPToken
-		case "git_cookies":
+		case gerritAuthGitCookies:
 			entry["gitcookiesContent"] = inst.GitcookiesContent
 		}
 		result = append(result, entry)
