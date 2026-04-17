@@ -116,6 +116,23 @@ component DEVELOPMENT.md files (see [BOOKMARKS.md](BOOKMARKS.md) > Component Dev
 - **Separate configuration from code**: Config changes must not require code changes. Externalize
   via env vars, ConfigMaps, manifests, or feature flags. If a value varies across environments
   or changes over time, it's config, not code.
+- **Image references must match across the stack**: Every image name and tag used in manifests,
+  env vars (`RUNNER_IMAGE`, `STATE_SYNC_IMAGE`), kustomization overlays, kind load commands, and
+  GHA build matrices must resolve to the same artifact. After changing an image name or tag,
+  grep all overlays, workflows, and ConfigMaps — mismatches cause silent deployment failures.
+- **Reconcile, don't create-or-skip**: Operator and backend code that creates K8s resources must
+  use update-or-create (reconcile) patterns, not create-and-ignore-`AlreadyExists`. Treating
+  `AlreadyExists` as success skips spec drift, label changes, and ownership updates.
+- **Never silently swallow partial failures**: Every error path must propagate or explicitly log
+  the failure. Do not discard errors from reconciliation loops, multi-step operations, or
+  cleanup routines. If a step can fail independently, collect errors and return them together.
+- **Namespace-scope shared state keys**: Cache keys, status map entries, and derived identifiers
+  that span multiple sessions or projects must include the namespace/project as a prefix.
+  Bare `sessionID` or `name` keys collide across tenants.
+- **Containers must run under restricted SecurityContext**: All init containers and sidecar
+  containers in manifests must set `runAsNonRoot: true`, drop `ALL` capabilities, and set
+  `readOnlyRootFilesystem: true` unless a specific write path is required. This applies to
+  all overlays including local-dev.
 
 Component-specific conventions:
 - Backend: [DEVELOPMENT.md](components/backend/DEVELOPMENT.md), [ERROR_PATTERNS.md](components/backend/ERROR_PATTERNS.md), [K8S_CLIENT_PATTERNS.md](components/backend/K8S_CLIENT_PATTERNS.md)
