@@ -81,6 +81,16 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
       return;
     }
 
+    const repoUrl = newMemory.repo.trim();
+    if (!repoUrl) {
+      toast.error("Target repository URL is required");
+      return;
+    }
+    if (!/^https:\/\/(github\.com|gitlab\.com|gitlab\.[a-z]+\.[a-z]+)\//.test(repoUrl)) {
+      toast.error("Enter a full repository URL (e.g. https://github.com/owner/repo)");
+      return;
+    }
+
     createMemory.mutate(
       {
         projectName,
@@ -88,20 +98,23 @@ export function ProjectMemorySection({ projectName }: ProjectMemorySectionProps)
           title: newMemory.title.trim(),
           content: newMemory.content.trim(),
           type: newMemory.type,
-          ...(newMemory.repo.trim() ? { repo: newMemory.repo.trim() } : {}),
+          repo: repoUrl,
         },
       },
       {
         onSuccess: (result) => {
-          if (newMemory.repo.trim()) {
-            addRepoToHistory(newMemory.repo.trim());
-          }
-          toast.success("Memory created successfully");
+          addRepoToHistory(repoUrl);
+          toast.success(
+            `Draft PR #${result.prNumber} created`,
+            {
+              description: `${newMemory.type}: ${newMemory.title.trim()}`,
+              action: result.prUrl
+                ? { label: "View PR", onClick: () => window.open(result.prUrl, "_blank") }
+                : undefined,
+            }
+          );
           setAddDialogOpen(false);
           setNewMemory({ title: "", content: "", type: "correction", repo: "" });
-          if (result.prUrl) {
-            window.open(result.prUrl, "_blank");
-          }
         },
         onError: () => {
           toast.error("Failed to create memory");
@@ -420,14 +433,14 @@ function AddMemoryButton({
             <InputWithHistory
               id="memory-repo"
               historyKey="memory-target-repo"
-              placeholder="owner/repo (e.g. jeremyeder/continuous-learning-example)"
+              placeholder="https://github.com/owner/repo"
               value={newMemory.repo}
               onChange={(e) =>
                 setNewMemory({ ...newMemory, repo: e.target.value })
               }
             />
             <p className="text-xs text-muted-foreground">
-              GitHub repository where the learned file will be added as a draft PR
+              Full URL to the GitHub or GitLab repository
             </p>
           </div>
           <div className="space-y-2">

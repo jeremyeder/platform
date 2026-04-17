@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -302,9 +303,13 @@ func CreateLearnedPR(c *gin.Context) {
 	repoURL := fmt.Sprintf("https://github.com/%s/%s", req.Owner, req.Repo)
 	token, err := GetGitHubTokenRepo(c.Request.Context(), reqK8s, reqDyn, project, userID.(string))
 	if err != nil {
-		log.Printf("Failed to get GitHub token for learned PR, project %s: %v", project, err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "GitHub authentication required. Connect GitHub via the Integrations page (GitHub App or PAT)."})
-		return
+		if fallback := os.Getenv("GITHUB_FALLBACK_TOKEN"); fallback != "" {
+			token = fallback
+		} else {
+			log.Printf("Failed to get GitHub token for learned PR, project %s: %v", project, err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "GitHub authentication required. Connect GitHub via the Integrations page (GitHub App or PAT)."})
+			return
+		}
 	}
 	_ = repoURL
 
