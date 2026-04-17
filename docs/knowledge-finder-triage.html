@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Finder — Post-v0.2.0 Triage</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --text-muted: #8b949e;
+    --red: #f85149; --orange: #d29922; --green: #3fb950;
+    --blue: #58a6ff; --purple: #bc8cff;
+    --radius: 8px;
+    --mono: 'SF Mono','Fira Code','Cascadia Code',monospace;
+    --sans: -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:var(--sans); background:var(--bg); color:var(--text); line-height:1.6; padding:2rem; max-width:1100px; margin:0 auto; }
+
+  header { border-bottom:1px solid var(--border); padding-bottom:1.5rem; margin-bottom:2rem; }
+  h1 { font-size:1.75rem; font-weight:600; margin-bottom:.5rem; }
+  header p { color:var(--text-muted); font-size:.9rem; }
+
+  .stats { display:flex; gap:1.5rem; margin:1rem 0; flex-wrap:wrap; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem 1.25rem; text-align:center; }
+  .stat-value { font-size:1.5rem; font-weight:700; color:var(--blue); }
+  .stat-label { font-size:.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+  .instructions { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; margin-bottom:2rem; font-size:.85rem; color:var(--text-muted); }
+  .instructions strong { color:var(--text); }
+  .instructions ol { padding-left:1.5rem; margin-top:.5rem; }
+  .instructions li { margin-bottom:.25rem; }
+
+  h2 { font-size:1.25rem; font-weight:600; margin:2rem 0 1rem; padding-bottom:.5rem; border-bottom:1px solid var(--border); }
+  h2 .count { font-weight:400; color:var(--text-muted); font-size:.9rem; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:1.25rem; overflow:hidden; }
+  .card:hover { border-color:var(--text-muted); }
+
+  .card-header { display:flex; align-items:flex-start; justify-content:space-between; padding:1rem 1.25rem; gap:1rem; flex-wrap:wrap; }
+  .card-title-area { flex:1; min-width:200px; }
+  .card-title { font-size:1rem; font-weight:600; margin-bottom:.25rem; }
+  .card-meta { font-size:.8rem; color:var(--text-muted); display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; }
+
+  .badge { display:inline-block; font-size:.65rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; padding:.15rem .5rem; border-radius:4px; }
+  .badge-dest-claude { background:#58a6ff18; border:1px solid #58a6ff40; color:var(--blue); }
+  .badge-dest-component { background:#bc8cff18; border:1px solid #bc8cff40; color:var(--purple); }
+
+  .rework-box { background:#d2992218; border:1px solid #d2992240; border-radius:var(--radius); padding:.5rem .75rem; margin:0 1.25rem .75rem; font-size:.8rem; color:var(--orange); }
+  .rework-box::before { content:"Rework prevented: "; font-weight:600; }
+
+  .dest-bar { font-family:var(--mono); font-size:.75rem; color:var(--text-muted); padding:.5rem 1rem; background:#0d1117; border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:.5rem; }
+  .dest-bar .arrow { color:var(--green); }
+
+  .card-content { padding:1rem 1.25rem; }
+  .proposed-text { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; font-family:var(--mono); font-size:.8rem; line-height:1.5; white-space:pre-wrap; word-break:break-word; color:var(--text); }
+  .proposed-text .hl { color:var(--blue); font-weight:600; }
+  .proposed-text .dim { color:var(--text-muted); }
+
+  .triage-actions { display:flex; gap:.5rem; padding:.75rem 1.25rem; border-top:1px solid var(--border); background:#0d1117; }
+  .triage-btn { font-family:var(--sans); font-size:.8rem; font-weight:500; padding:.4rem 1rem; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text-muted); cursor:pointer; transition:all .15s; }
+  .triage-btn:hover { border-color:var(--text-muted); color:var(--text); }
+  .triage-btn.active-merge { background:#3fb95018; border-color:var(--green); color:var(--green); }
+  .triage-btn.active-edit { background:#58a6ff18; border-color:var(--blue); color:var(--blue); }
+  .triage-btn.active-close { background:#f8514918; border-color:var(--red); color:var(--red); }
+
+  .summary-bar { position:sticky; bottom:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.5rem; margin-top:2rem; display:flex; justify-content:space-between; align-items:center; box-shadow:0 -4px 16px rgba(0,0,0,.3); z-index:10; }
+  .summary-counts { display:flex; gap:1.5rem; font-size:.85rem; }
+  .summary-counts .m { color:var(--green); }
+  .summary-counts .e { color:var(--blue); }
+  .summary-counts .c { color:var(--red); }
+  .summary-counts .p { color:var(--orange); }
+
+  @media print { .triage-actions,.summary-bar{display:none} body{background:#fff;color:#000} .card{break-inside:avoid;border-color:#ccc} .proposed-text{background:#f6f8fa;color:#24292e} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Knowledge Finder — Post-v0.2.0 Triage</h1>
+  <p>23 PRs analyzed since v0.2.0 (April 10–17, 2026). 6 consolidated guidelines extracted. Each shows its proposed destination based on impact radius.</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">→ CLAUDE.md</div></div>
+    <div class="stat"><div class="stat-value">1</div><div class="stat-label">→ Component Guide</div></div>
+    <div class="stat"><div class="stat-value">23</div><div class="stat-label">PRs Analyzed</div></div>
+  </div>
+</header>
+
+<div class="instructions">
+  <strong>Triage checklist</strong> — for each item, ask:
+  <ol>
+    <li>Is it cross-cutting enough for its proposed destination?</li>
+    <li>Would an agent knowing this have avoided the rework described?</li>
+    <li>Is the wording concise and actionable?</li>
+    <li>Does it duplicate anything already in Critical Conventions?</li>
+  </ol>
+</div>
+
+<!-- ========== CLAUDE.MD ITEMS ========== -->
+<h2>→ CLAUDE.md Critical Conventions <span class="count">(5 cross-cutting guidelines)</span></h2>
+
+<!-- ITEM 1 -->
+<div class="card" data-id="1">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">Design for extensibility before adding items</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-claude">→ CLAUDE.md</span>
+        <span>PR #1333 → #1326</span>
+      </div>
+    </div>
+  </div>
+  <div class="rework-box">PR #1333 built menu infrastructure with unconditional separator. PR #1326 had to rework it to make separators conditional and feature-flag-gated.</div>
+  <div class="dest-bar"><span class="arrow">→</span> Append to CLAUDE.md > Critical Conventions</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="hl">- **Design for extensibility before adding items**</span>: When building infrastructure that will have
+  things added to it (menus, config schemas, API surfaces), build the extensibility mechanism
+  first — conditional rendering, feature-flag gating, discovery. Retrofitting causes rework.</div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(1,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(1,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(1,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ITEM 2 -->
+<div class="card" data-id="2">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">Verify contracts and references, don't assume</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-claude">→ CLAUDE.md</span>
+        <span>PR #1325, PR #1329</span>
+      </div>
+    </div>
+  </div>
+  <div class="rework-box">PR #1325: hook used nonexistent $CLAUDE_TOOL_INPUT env var. PR #1329: script referenced old file path after directory restructuring — silently did nothing.</div>
+  <div class="dest-bar"><span class="arrow">→</span> Append to CLAUDE.md > Critical Conventions</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="hl">- **Verify contracts and references**</span>: Before building on an assumption (env var exists, path is
+  correct, URL is reachable), verify the contract. After moving anything, grep scripts, workflows,
+  manifests, and configs — not just source code.</div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(2,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(2,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(2,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ITEM 3 -->
+<div class="card" data-id="3">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">CI/CD security and automation</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-claude">→ CLAUDE.md</span>
+        <span>PR #1310, PR #1334, PR #1331</span>
+      </div>
+    </div>
+  </div>
+  <div class="rework-box">PR #1310: pull_request_target granted write access to forked PRs. PR #1334: hardcoded bot token rotted, returned 401. PR #1331: auto-merge failed silently without repo setting.</div>
+  <div class="dest-bar"><span class="arrow">→</span> Append to CLAUDE.md > Critical Conventions</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="hl">- **CI/CD security**</span>: Never use `pull_request_target` (grants write access to forked PR code).
+  Never hardcode tokens — use `actions/create-github-app-token`. For automated pipelines:
+  discovery → validation → PR → auto-merge.</div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(3,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(3,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(3,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ITEM 4 -->
+<div class="card" data-id="4">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">Full-stack awareness for cross-cutting changes</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-claude">→ CLAUDE.md</span>
+        <span>PR #1282, PR #1289</span>
+      </div>
+    </div>
+  </div>
+  <div class="rework-box">PR #1282: existing S3 seeding pipeline could be reused instead of inventing parallel upload. PR #1289: credential scoping required updating all consumers (backend, CLI, SDK, runner, sidecar) simultaneously.</div>
+  <div class="dest-bar"><span class="arrow">→</span> Append to CLAUDE.md > Critical Conventions</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="hl">- **Full-stack awareness**</span>: Before building a new pipeline, check if an existing one can be
+  reused. Auth/credential/API changes must update ALL consumers (backend, CLI, SDK, runner,
+  sidecar) in the same PR.</div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(4,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(4,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(4,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ITEM 5 -->
+<div class="card" data-id="5">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">Separate configuration from code</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-claude">→ CLAUDE.md</span>
+        <span>PR #1337, general principle</span>
+      </div>
+    </div>
+  </div>
+  <div class="rework-box">PR #1337: frontend hardcoded localhost:8000 instead of using env var — broke kind/prod deployments. Values that vary by environment must be externalized.</div>
+  <div class="dest-bar"><span class="arrow">→</span> Append to CLAUDE.md > Critical Conventions</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="hl">- **Separate configuration from code**</span>: Config changes must not require code changes. Externalize
+  via env vars, ConfigMaps, manifests, or feature flags. If a value varies across environments
+  or changes over time, it's config, not code.</div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(5,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(5,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(5,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ========== COMPONENT GUIDE ITEMS ========== -->
+<h2>→ Component Guide <span class="count">(1 operator-specific guideline)</span></h2>
+
+<!-- ITEM 6 -->
+<div class="card" data-id="6">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">Defensive Kubernetes patterns</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-component">→ operator/DEVELOPMENT.md</span>
+        <span>PR #1290, PR #1299</span>
+      </div>
+    </div>
+  </div>
+  <div class="rework-box">PR #1290: deletecollection denied by RBAC, orphaned pods accumulated. PR #1299: operator OOMKilled at scale, needed resource limits + GOMEMLIMIT.</div>
+  <div class="dest-bar"><span class="arrow">→</span> New section in components/operator/DEVELOPMENT.md</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="hl">## Defensive Patterns</span>
+
+<span class="hl">- **Deletion fallback**</span>: Try `deletecollection` first; if RBAC denies, fall back to list+delete.
+  Without this, orphaned pods accumulate silently.
+<span class="hl">- **Resource limits from day one**</span>: Set requests/limits AND `GOMEMLIMIT` on Go controllers.
+  PR #1299 fixed OOMKills at scale.
+<span class="hl">- **Proxy propagation**</span>: HTTP/HTTPS/NO_PROXY do NOT auto-propagate to spawned pods/sidecars.
+  Forward them explicitly in the reconciler.
+<span class="hl">- **Service URL parameterization**</span>: In-cluster DNS differs from localhost. Use env vars with
+  per-overlay values, never hardcoded URLs.</div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(6,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(6,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(6,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ========== ALSO ========== -->
+<h2>Also <span class="count">(infrastructure change)</span></h2>
+
+<div class="card" data-id="7" style="border-left:3px solid var(--blue)">
+  <div class="card-header">
+    <div class="card-title-area">
+      <div class="card-title">Update Critical Conventions section description</div>
+      <div class="card-meta">
+        <span class="badge badge-dest-claude">→ CLAUDE.md</span>
+        <span>Housekeeping</span>
+      </div>
+    </div>
+  </div>
+  <div class="dest-bar"><span class="arrow">→</span> Replace section description in CLAUDE.md > Critical Conventions</div>
+  <div class="card-content">
+    <div class="proposed-text"><span class="dim">Current:</span>
+Rules that apply across ALL components. Per-component details live in component DEVELOPMENT.md files.
+
+<span class="dim">Proposed:</span>
+<span class="hl">Cross-cutting rules that apply across ALL components. Component-specific conventions live in
+component DEVELOPMENT.md files (see [BOOKMARKS.md](BOOKMARKS.md) > Component Development Guides).</span></div>
+  </div>
+  <div class="triage-actions">
+    <button class="triage-btn" onclick="triage(7,'merge',this)">Merge</button>
+    <button class="triage-btn" onclick="triage(7,'edit',this)">Edit + Merge</button>
+    <button class="triage-btn" onclick="triage(7,'close',this)">Close</button>
+  </div>
+</div>
+
+<!-- ========== STICKY SUMMARY ========== -->
+<div class="summary-bar">
+  <div class="summary-counts">
+    <span class="m" id="mc">0 merge</span>
+    <span class="e" id="ec">0 edit</span>
+    <span class="c" id="cc">0 close</span>
+    <span class="p" id="pc">7 pending</span>
+  </div>
+  <div style="font-size:.8rem;color:var(--text-muted)">Click buttons above to triage each item</div>
+</div>
+
+<script>
+const D={},N=7;
+function triage(id,d,btn){
+  D[id]=d;
+  const c=btn.closest('.card');
+  c.querySelectorAll('.triage-btn').forEach(b=>b.classList.remove('active-merge','active-edit','active-close'));
+  btn.classList.add('active-'+d);
+  c.style.opacity=d==='close'?'0.4':'1';
+  const v=Object.values(D);
+  document.getElementById('mc').textContent=v.filter(x=>x==='merge').length+' merge';
+  document.getElementById('ec').textContent=v.filter(x=>x==='edit').length+' edit';
+  document.getElementById('cc').textContent=v.filter(x=>x==='close').length+' close';
+  document.getElementById('pc').textContent=(N-v.length)+' pending';
+}
+</script>
+</body>
+</html>
