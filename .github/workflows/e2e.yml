@@ -12,6 +12,10 @@ on:
 env:
   KIND_VERSION: "v0.27.0"
 
+permissions:
+  contents: read
+  actions: write
+
 concurrency:
   group: e2e-tests-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
@@ -29,12 +33,12 @@ jobs:
       claude-runner: ${{ steps.filter.outputs.claude-runner }}
     steps:
       - name: Checkout PR code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Check for component changes
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
         id: filter
         with:
           filters: |
@@ -57,12 +61,12 @@ jobs:
 
     steps:
     - name: Checkout PR code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Cleanup Diskspace
-      uses: kubeflow/pipelines/.github/actions/github-disk-cleanup@master
+      uses: kubeflow/pipelines/.github/actions/github-disk-cleanup@ab1231a5c32c688bcb62314e467011b586aee796 # master
       if: (!cancelled())
 
     - name: Validate AGENTS.md symlink
@@ -75,7 +79,7 @@ jobs:
         echo "✅ AGENTS.md symlink is valid"
 
     - name: Set up Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
       with:
         node-version: '20'
         cache: 'npm'
@@ -86,13 +90,13 @@ jobs:
       run: npm ci
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       with:
         driver-opts: network=host
 
     - name: Build or pull frontend image
       if: needs.detect-changes.outputs.frontend == 'true'
-      uses: docker/build-push-action@v7
+      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
       with:
         context: components/frontend
         file: components/frontend/Dockerfile
@@ -111,7 +115,7 @@ jobs:
 
     - name: Build or pull backend image
       if: needs.detect-changes.outputs.backend == 'true'
-      uses: docker/build-push-action@v7
+      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
       with:
         context: components/backend
         file: components/backend/Dockerfile
@@ -130,7 +134,7 @@ jobs:
 
     - name: Build or pull operator image
       if: needs.detect-changes.outputs.operator == 'true'
-      uses: docker/build-push-action@v7
+      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
       with:
         context: components/operator
         file: components/operator/Dockerfile
@@ -149,7 +153,7 @@ jobs:
 
     - name: Build or pull ambient-runner image
       if: needs.detect-changes.outputs.claude-runner == 'true'
-      uses: docker/build-push-action@v7
+      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
       with:
         context: components/runners
         file: components/runners/ambient-runner/Dockerfile
@@ -170,7 +174,7 @@ jobs:
       run: docker images | grep e2e-test
 
     - name: Cache kind binary
-      uses: actions/cache@v4
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/k8s-tools/kind
         key: kind-${{ runner.os }}-${{ env.KIND_VERSION }}
@@ -229,7 +233,7 @@ jobs:
 
     - name: Upload test results
       if: failure()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: cypress-screenshots-pr-${{ github.event.pull_request.number }}
         path: e2e/cypress/screenshots
@@ -238,7 +242,7 @@ jobs:
 
     - name: Upload test videos
       if: failure()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: cypress-videos-pr-${{ github.event.pull_request.number }}
         path: e2e/cypress/videos
