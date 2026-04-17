@@ -98,6 +98,7 @@ Rules that apply across ALL components. Per-component details live in component 
 - **No `panic()` in production**: Return explicit `fmt.Errorf` with context
 - **No `any` types in frontend**: Use proper types, `unknown`, or generic constraints
 - **Feature flags strongly recommended**: Gate new features behind Unleash flags. Use `/unleash-flag` to set up
+- **No new CRDs**: Existing CRDs (AgenticSession, ProjectSettings) are grandfathered. For new persistent storage, confirm with the user whether to use repo files or PostgreSQL — do not default to K8s custom resources
 - **Conventional commits**: Squashed on merge to `main`
 
 Component-specific conventions:
