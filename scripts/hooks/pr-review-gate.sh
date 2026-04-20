@@ -8,7 +8,8 @@
 #   2 = block the tool call (stderr shown to agent as reason)
 set -euo pipefail
 
-COMMAND=$(echo "$CLAUDE_TOOL_INPUT" | jq -r '.command // ""')
+HOOK_INPUT=$(cat)
+COMMAND=$(echo "$HOOK_INPUT" | jq -r '.tool_input.command // ""')
 
 if ! echo "$COMMAND" | grep -qE '^\s*gh\s+pr\s+create\b'; then
     exit 0
