@@ -334,11 +334,12 @@ class TestBuildWorkspaceContextPrompt:
             ambient_config={},
             workspace_path="/workspace",
         )
-        assert "Git Safety Guardrails" in prompt
-        assert "NEVER force push" in prompt
+        assert "Git Safety" in prompt
+        assert "NEVER embed tokens" in prompt
+        assert "Do NOT autonomously escalate" in prompt
 
     def test_prompt_excludes_git_safety_without_repos(self):
-        """Git safety guardrails are excluded when no repos are present."""
+        """Git safety instructions are excluded when no repos are present."""
         prompt = build_workspace_context_prompt(
             repos_cfg=[],
             workflow_name=None,
@@ -346,7 +347,7 @@ class TestBuildWorkspaceContextPrompt:
             ambient_config={},
             workspace_path="/workspace",
         )
-        assert "Git Safety Guardrails" not in prompt
+        assert "Git Safety" not in prompt
 
     def test_prompt_without_repos(self):
         """Test prompt generation when no repos are configured."""
