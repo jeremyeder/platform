@@ -68,6 +68,24 @@ GIT_PUSH_STEPS = (
     "the feature branch (`{branch}`). If push fails, do NOT fall back to main.\n\n"
 )
 
+GIT_SAFETY_INSTRUCTIONS = (
+    "## Git Safety Guardrails\n\n"
+    "### Hard Rules\n\n"
+    "1. **NEVER delete remote branches or refs** — do NOT use "
+    "`git push --delete`, `git push origin :branch`, or "
+    "`gh api -X DELETE .../git/refs/...`.\n"
+    "2. **NEVER manipulate git refs via the GitHub/GitLab REST API** — if "
+    "`git push` fails, report the failure and stop.\n"
+    "3. **NEVER force push** — do not use `git push --force` or `-f`. "
+    "Use `--force-with-lease` only with explicit user approval.\n"
+    "4. **NEVER push to main/master** — treat them as read-only.\n"
+    "5. **NEVER run destructive operations without a backup** — before "
+    "`git reset --hard`, `git clean -fd`, or `git checkout -- .`, "
+    "create a backup branch first.\n"
+    "6. **NEVER embed tokens in commands** — use environment variables.\n\n"
+    "When a git operation fails: stop, diagnose, report, wait for the user.\n\n"
+)
+
 RUBRIC_EVALUATION_HEADER = "## Rubric Evaluation\n\n"
 
 RUBRIC_EVALUATION_INTRO = (
@@ -214,6 +232,9 @@ def build_workspace_context_prompt(
                 repo_name = repo.get("name", "unknown")
                 prompt += f"- **repos/{repo_name}/**\n"
             prompt += GIT_PUSH_STEPS.format(branch=push_branch)
+
+    if repos_cfg:
+        prompt += GIT_SAFETY_INSTRUCTIONS
 
     # Human-in-the-loop instructions
     prompt += HUMAN_INPUT_INSTRUCTIONS
