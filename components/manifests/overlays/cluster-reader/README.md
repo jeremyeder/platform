@@ -22,13 +22,14 @@ oc apply -k components/manifests/overlays/cluster-reader/
 
 # Override namespace
 cd components/manifests/overlays/cluster-reader
-kustomize edit set namespace my-namespace
+NS=my-namespace
+kustomize edit set namespace "${NS}"
 oc apply -k .
 
 # Get a token (max 1 year)
-oc create token readonly-admin -n ambient-code --duration=8760h
+oc create token readonly-admin -n "${NS}" --duration=8760h
 
 # Verify read-only access
-oc auth can-i get pods --all-namespaces --as=system:serviceaccount:ambient-code:readonly-admin
-oc auth can-i delete pods -n ambient-code --as=system:serviceaccount:ambient-code:readonly-admin
+oc auth can-i get pods --all-namespaces --as=system:serviceaccount:${NS}:readonly-admin
+oc auth can-i delete pods -n "${NS}" --as=system:serviceaccount:${NS}:readonly-admin
 ```
