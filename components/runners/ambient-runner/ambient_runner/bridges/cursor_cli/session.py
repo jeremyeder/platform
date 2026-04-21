@@ -1,8 +1,8 @@
 # components/runners/ambient-runner/ambient_runner/bridges/cursor_cli/session.py
 """Subprocess management for the Cursor CLI bridge.
 
-The Cursor CLI `agent` binary is invoked once per turn.
-Each query() call spawns `agent -p --force --trust ... "<prompt>"`,
+The Cursor CLI `cursor-agent` binary is invoked once per turn.
+Each query() call spawns `cursor-agent --print --force ... "<prompt>"`,
 reads NDJSON from stdout, and tears down the process when done.
 """
 
@@ -85,10 +85,9 @@ class CursorSessionWorker:
     ) -> AsyncIterator[str]:
         """Spawn the Cursor CLI and yield NDJSON lines from stdout."""
         cmd = [
-            "agent",
-            "-p",
+            "cursor-agent",
+            "--print",
             "--force",
-            "--trust",
             "--approve-mcps",
             "--output-format",
             "stream-json",
@@ -285,7 +284,9 @@ class CursorSessionManager:
             with open(self._ids_path, "w") as f:
                 json.dump(self._session_ids, f)
         except OSError:
-            logger.debug("Could not persist session IDs to %s", self._ids_path, exc_info=True)
+            logger.debug(
+                "Could not persist session IDs to %s", self._ids_path, exc_info=True
+            )
 
     def _restore_session_ids(self) -> None:
         if not self._ids_path:
@@ -296,12 +297,16 @@ class CursorSessionManager:
             if isinstance(restored, dict):
                 self._session_ids.update(restored)
                 logger.info(
-                    "Restored %d Cursor session ID(s) from %s", len(restored), self._ids_path
+                    "Restored %d Cursor session ID(s) from %s",
+                    len(restored),
+                    self._ids_path,
                 )
         except FileNotFoundError:
             pass
         except (OSError, json.JSONDecodeError):
-            logger.debug("Could not restore session IDs from %s", self._ids_path, exc_info=True)
+            logger.debug(
+                "Could not restore session IDs from %s", self._ids_path, exc_info=True
+            )
 
     def clear_session_ids(self) -> None:
         self._session_ids.clear()
@@ -312,7 +317,9 @@ class CursorSessionManager:
             except FileNotFoundError:
                 pass
             except OSError:
-                logger.debug("Could not remove session IDs at %s", self._ids_path, exc_info=True)
+                logger.debug(
+                    "Could not remove session IDs at %s", self._ids_path, exc_info=True
+                )
 
     async def interrupt(self, thread_id: str) -> None:
         worker = self._workers.get(thread_id)
