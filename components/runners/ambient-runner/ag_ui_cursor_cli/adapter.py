@@ -125,15 +125,6 @@ class CursorCLIAdapter:
                             message_id=current_message_id,
                             delta=event.content,
                         )
-
-                    if not event.delta and text_message_open:
-                        async for ev in self._flush_text_message(
-                            current_message_id, accumulated_text, run_messages
-                        ):
-                            yield ev
-                        text_message_open = False
-                        current_message_id = None
-                        accumulated_text = ""
                     continue
 
                 # ── tool_call started ──
@@ -168,7 +159,11 @@ class CursorCLIAdapter:
                             type=EventType.TOOL_CALL_END,
                             tool_call_id=tid,
                         )
-                        result_content = event.error if event.error else (event.output or "(completed)")
+                        result_content = (
+                            event.error
+                            if event.error
+                            else (event.output or "(completed)")
+                        )
                         yield ToolCallResultEvent(
                             type=EventType.TOOL_CALL_RESULT,
                             tool_call_id=tid,
