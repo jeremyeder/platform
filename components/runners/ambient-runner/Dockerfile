@@ -10,6 +10,11 @@ ARG GLAB_VERSION=1.52.0
 ARG UV_VERSION=0.7.8
 ARG PRE_COMMIT_VERSION=4.2.0
 ARG GEMINI_CLI_VERSION=0.1.17
+# NOTE: CURSOR_CLI_VERSION is a documentation-only placeholder. The official
+# installer (cursor.com/install) fetches "latest" automatically and does not
+# accept a version argument. Switch to a pinned binary URL once Cursor
+# publishes versioned releases. Not included in runner-tool-versions sanity check.
+ARG CURSOR_CLI_VERSION=1.0.0
 
 # Install system packages: Python 3.12, git, jq, Node.js, Go
 RUN dnf install -y python3 python3-pip python3-devel \
@@ -42,6 +47,15 @@ RUN pip3 install --break-system-packages --no-cache-dir '/app/ambient-runner[all
 # Install Gemini CLI (npm package, Node.js already available)
 RUN npm install -g @google/gemini-cli@${GEMINI_CLI_VERSION} && \
     npm cache clean --force
+
+# Install Cursor CLI via official installer.
+# The binary is placed at ~/.local/bin/agent; symlink to /usr/local/bin/agent
+# so it is in PATH for all users (including the non-root UID 1001 runtime user).
+RUN curl -fsSL "https://cursor.com/install" -o /tmp/cursor-install.sh && \
+    HOME=/root bash /tmp/cursor-install.sh && \
+    rm /tmp/cursor-install.sh && \
+    chmod +x /root/.local/bin/agent && \
+    ln -sf /root/.local/bin/agent /usr/local/bin/agent
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
