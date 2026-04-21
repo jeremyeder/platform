@@ -11,9 +11,9 @@ ARG UV_VERSION=0.7.8
 ARG PRE_COMMIT_VERSION=4.2.0
 ARG GEMINI_CLI_VERSION=0.1.17
 
-# Install system packages: Python 3.12, git, jq, Node.js, Go
+# Install system packages: Python 3.12, git, jq, Node.js, Go, unzip (needed by CodeRabbit install script)
 RUN dnf install -y python3 python3-pip python3-devel \
-    git jq nodejs npm go-toolset && \
+    git jq nodejs npm go-toolset unzip && \
     dnf clean all
 
 # Install GitHub CLI and GitLab CLI (binary downloads, pinned)
