@@ -48,14 +48,13 @@ RUN pip3 install --break-system-packages --no-cache-dir '/app/ambient-runner[all
 RUN npm install -g @google/gemini-cli@${GEMINI_CLI_VERSION} && \
     npm cache clean --force
 
-# Install Cursor CLI via official installer.
-# The binary is placed at ~/.local/bin/agent; symlink to /usr/local/bin/agent
-# so it is in PATH for all users (including the non-root UID 1001 runtime user).
-RUN curl -fsSL "https://cursor.com/install" -o /tmp/cursor-install.sh && \
-    HOME=/root bash /tmp/cursor-install.sh && \
-    rm /tmp/cursor-install.sh && \
-    chmod +x /root/.local/bin/agent && \
-    ln -sf /root/.local/bin/agent /usr/local/bin/agent
+# Install Cursor Agent CLI via official installer.
+# The installer places the binary at $HOME/.local/bin/cursor-agent.
+# We run as root during build, then symlink to /usr/local/bin/ so it's
+# in PATH for the runtime user (UID 1001).
+RUN curl -fsSL "https://cursor.com/install" | bash && \
+    ln -sf /root/.local/bin/cursor-agent /usr/local/bin/cursor-agent && \
+    chmod +x /usr/local/bin/cursor-agent
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
